@@ -1,0 +1,4 @@
+- HW1.ipynb is the main file with code and report. 
+- It is intended to be run via Google Colaboratory using the following [link](https://colab.research.google.com/github/tsimafeip/LCT-master-course/blob/main/UdS/WinterSemester/CompLing/Assignments/HW1/HW1.ipynb)
+- Simply execute all cells, required data will be uploaded automatically.
+- Time of Bulgarian and Turkish data processing is quite long (~45s), please take it into the account.

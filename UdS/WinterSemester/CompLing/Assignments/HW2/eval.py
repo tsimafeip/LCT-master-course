@@ -19,7 +19,7 @@ for line_gold, line_system in zip(file_gold, file_system):
 
 	line_gold = line_gold.rstrip()
 	line_system = line_system.rstrip()
-        n = n+1
+	n = n+1
 
 	if len(line_gold) != 0:
 

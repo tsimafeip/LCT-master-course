@@ -1,3 +1,7 @@
+- This homework is about basics of Computational linguistics:
+    - Zipf’s Law verification for different languages
+    - Text generation using bigram models
+    - Testing the independence assumptions of unigram language models with PMI calculation
 - HW1.ipynb is the main file with code and report. 
 - It is intended to be run via Google Colaboratory using the following [link](https://colab.research.google.com/github/tsimafeip/LCT-master-course/blob/main/UdS/WinterSemester/CompLing/Assignments/HW1/HW1.ipynb).
 - Simply execute all cells, required data will be uploaded automatically.

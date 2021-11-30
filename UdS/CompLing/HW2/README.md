@@ -1,0 +1,5 @@
+- This homework is about a bigram part-of-speech (POS) tagger based on Hidden Markov Models.
+- HW2.ipynb is the main file with code and report. 
+- It is intended to be run via Google Colaboratory using the following [link](https://colab.research.google.com/github/tsimafeip/LCT-master-course/blob/main/UdS/WinterSemester/CompLing/Assignments/HW1/HW1.ipynb).
+- Simply execute all cells, required data will be uploaded automatically.
+- Final quality is ~91%. It can be improved by better implementation of unknown words handling.

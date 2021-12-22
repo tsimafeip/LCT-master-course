@@ -1,11 +1,14 @@
 # Parts of the skeleton of this file is adapted from a UdS HLCV Course Assignment SS2021
+import numpy as np
+
 import torch
 import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import random_split
 from torchvision.utils import make_grid
-import numpy as np
-import matplotlib.pyplot as plt
+
+from torchvision.datasets import CIFAR10
+from sklearn.model_selection import train_test_split
 
 """
 DO NOT CHANGE ANYTHING INSIDE THE BLOCK QUOTES
@@ -16,6 +19,7 @@ torch.manual_seed(35)
 np.random.seed(23)
 
 
+#Transform PIL images to Tensors
 class ReshapeTransform:
     def __init__(self, new_size):
         self.new_size = new_size
@@ -28,53 +32,30 @@ class ReshapeTransform:
         :param img: original image Tensor of shape (C,H,W) or (H,W,C)
         :return: flattened image Tensor in new_size
         """
-        return
+        return torch.reshape(img, self.new_size)
+        
+def get_cifar10_dataset(batch_size = 128):
+  transform = transforms.Compose(
+    [transforms.ToTensor(),
+     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+     ReshapeTransform((3072,))])  
+  
+  cifar10_dataset = CIFAR10(root='./data', download=True, transform=transform)
 
+  trainset, valset = train_test_split(cifar10_dataset, test_size=0.1, shuffle=False)
 
-def get_cifar10_dataset(val_size=5000, batch_size=128):
-    """
-    Load and transform the CIFAR10 dataset. Make Validation set. Create dataloaders for
-    train, test, validation sets.
+  train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
+                                          shuffle=False, num_workers=2)
 
-    :param val_size: size of the validation partition
-    :param batch_size: number of samples in a batch
-    :return:
-    """
+  val_loader = torch.utils.data.DataLoader(valset, batch_size*2, num_workers=4, 
+                                           pin_memory=True,shuffle=False)
 
-    """
-    Q1.2
-    Compose the instances of transpose functions into a vector. For normalization, use mean=0.5 and sd=0.5.
-    e.g. transform = transforms.Compose([..., ..., ...])
-    
-    """
-    # TODO: START YOUR CODE HERE: Compose the transform function
-
-    transform = None  # replace None with your code here
-
-    # TODO: Load the train_set and test_set from PyTorch; replace the None to your solution
-    train_set = None
-    test_set = None
-    """
-    DO NOT CHANGE THE CODE BELOW
-    """
-    classes = train_set.classes
-
-    """
-    Q1.3 
-    Split our train data into train_set and val_set.
-    Use val_size (10% of the data) for validation.
-    Use the DataLoader module from PyTorch for this part.
-    """
-    # TODO: Split your data and define train_loader, test_loader, val_loader; replace the None with your solution
-    train_size = None
-    train_set, val_set = None
-
-    train_loader = None
-    test_loader = None
-    val_loader = None
-
-    """END OF YOUR CODE -- DO NOT CHANGE THE RETURN"""
-    return train_loader, test_loader, val_loader, classes
+  testset = torchvision.datasets.CIFAR10(root='./data', train=False,
+                                       download=True, transform=transform)
+  test_loader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
+                                         shuffle=False, num_workers=2)
+  
+  return train_loader, test_loader, val_loader, cifar10_dataset.classes
 
 
 """
@@ -84,8 +65,6 @@ Only Numpy and standard library built-in operations are allowed.
 
 DO NOT CHANGE THE EXISTING CODE UNLESS SPECIFIED
 """
-
-
 class NeuralNetworkModel:
     """
     A two-layer fully-connected neural network. The model has an input dimension of
@@ -167,21 +146,27 @@ class NeuralNetworkModel:
 
         # N == number of samples
         # D == number of features or dimensions per sample
+        
+  
         # Eq 3:
-
+        a1 = X
 
         # Eq 4:
-
+        z2 = np.add(np.matmul(a1, W1), b1)
 
         # Eq 5:
 
-
+        a2 = np.maximum(0, z2)
 
         # Eq 6:
-
+        z3 = np.add(np.matmul(a2, W2), b2)
 
         # Eq 7:
-        a_3 = None  # change from None to your output
+        epsilon = 1e-9
+        z3 = np.clip(z3, epsilon, 1. - epsilon)
+        e_x = np.exp(z3.numpy())
+        softmax = (e_x / e_x.sum(axis=1)[:,None])
+        a_3 = softmax  # change from None to your output
 
         """
         DO NOT TOUCH THE CODE BELOW
@@ -211,13 +196,16 @@ class NeuralNetworkModel:
         # Implement the loss for softmax output layer
 
         # Eq 11
-
+        log_probability = -np.log(softmax[np.arange(N), y])
 
         # Eq 12
-
+        cross_entropy = np.sum(log_probability) / N
+        
 
         # Eq 13
+        regularization = reg*(np.sum(np.square(W1)) + np.sum(np.square(W2)))
 
+        loss = cross_entropy + regularization
 
         """
         DO NOT TOUCH THE CODE BELOW
@@ -257,4 +245,3 @@ class NeuralNetworkModel:
         """END OF YOUR CODE: DO NOT CHANGE THE RETURN*****"""
 
         return loss, grads
-

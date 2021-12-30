@@ -138,7 +138,7 @@ def train_loop(model: nn.Module, optimizer: torch.optim.Optimizer, loss_function
 
         for i, item in enumerate(dataloader):
             # simple logging to understand the stage of training process inside one epoch
-            if (i + 1) % 1000 == 0:
+            if (i + 1) % 100 == 0:
                 print(i + 1, end=" ")
 
             # two 1d-vector-like Tensors with the same length

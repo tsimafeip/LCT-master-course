@@ -1,3 +1,5 @@
+import time
+
 from typing import List, Union, Tuple, Callable, Optional, Dict
 from comet_ml import Experiment
 
@@ -94,6 +96,12 @@ class BertPosTagger(nn.Module):
         # predictions = [sent len, output dim]
         return torch.squeeze(predictions, 1)
 
+
+def epoch_time(start_time, end_time):
+    elapsed_time = end_time - start_time
+    elapsed_mins = int(elapsed_time / 60)
+    elapsed_secs = int(elapsed_time - (elapsed_mins * 60))
+    return elapsed_mins, elapsed_secs
 
 def accuracy(gold_tags, prediction_output) -> float:
     """Calculates accuracy based on gold tags and prediction output."""
@@ -233,12 +241,16 @@ def train_model(
     # iterates by epochs
     for epoch in range(1, num_epochs + 1):
         print(f'Epoch #{epoch}')
+        start_time = time.time()
         train_loss, train_accuracy = train_loop(model_to_train, optimizer, loss_function, train_dataloader, epoch=epoch,
                                                 comet_experiment=comet_experiment,
                                                 tokens_transformation_func=embedding_trasformation_func)
         val_loss, val_accuracy = validation_loop(model_to_train, loss_function, dev_dataloader, epoch=epoch,
                                                  comet_experiment=comet_experiment,
                                                  tokens_transformation_func=embedding_trasformation_func)
+
+        end_time = time.time()
+        epoch_mins, epoch_secs = epoch_time(start_time, end_time)
 
         print()
         print(f"Train: Loss {train_loss} | Accuracy {train_accuracy}")

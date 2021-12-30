@@ -1,4 +1,4 @@
-from typing import List, Union, Tuple, Callable
+from typing import List, Union, Tuple, Callable, Optional, Dict
 from comet_ml import Experiment
 
 import torch
@@ -115,6 +115,9 @@ def train_loop(model: nn.Module, optimizer: torch.optim.Optimizer, loss_function
     :param optimizer: a pytorch optimizer
     :param loss_function: the type of loss function to use
     :param dataloader: a dataloader for getting the training instances
+    :param epoch: optional epoch number for logging purposes
+    :param comet_experiment: reference to Comet experiment
+    :param
 
     :return: (epoch_loss, epoch_accuracy): metrics to evaluate the current state of model
     """
@@ -122,6 +125,7 @@ def train_loop(model: nn.Module, optimizer: torch.optim.Optimizer, loss_function
     model.train()
 
     def _train():
+        """Dummy function to handle situation with non-set Comet experiment."""
         accuracy_sum = loss_sum = 0
 
         for i, item in enumerate(dataloader):
@@ -211,10 +215,18 @@ def validation_loop(model: nn.Module, loss_function, dataloader: DataLoader, epo
     return epoch_loss, epoch_accuracy
 
 
-def train_model(model_to_train: nn.Module, checkpoint_filename: str, optimizer_class,
-                loss_function, train_dataloader: DataLoader, dev_dataloader: DataLoader,
-                learning_rate, num_epochs: int, comet_experiment: Experiment = None, embedding_trasformation_func=None):
+def train_model(
+        model_to_train: nn.Module, optimizer_class,
+        loss_function, train_dataloader: DataLoader, dev_dataloader: DataLoader,
+        learning_rate, num_epochs: int,
+        save_best_checkpoint: bool = False,
+        checkpoint_filename: Optional[str] = None,
+        comet_experiment: Optional[Experiment] = None,
+        embedding_trasformation_func: Optional[Callable[[torch.LongTensor], torch.LongTensor]] = None,
+) -> Tuple[int, float, float, Dict]:
+    """"""
     best_epoch = best_accuracy = best_val_loss = float('inf')
+    best_model_state = None
 
     # create optimizer instance
     optimizer = optimizer_class(model_to_train.parameters(), lr=learning_rate)
@@ -238,9 +250,11 @@ def train_model(model_to_train: nn.Module, checkpoint_filename: str, optimizer_c
             best_val_loss = val_loss
             best_epoch = epoch
             best_accuracy = val_accuracy
-            torch.save(model_to_train.state_dict(), checkpoint_filename)
+            best_model_state = model_to_train.state_dict()
+            if save_best_checkpoint:
+                torch.save(model_to_train.state_dict(), checkpoint_filename)
 
-    return best_epoch, best_accuracy, best_val_loss
+    return best_epoch, best_accuracy, best_val_loss, best_model_state
 
 
 def _predict_pos(trained_model: nn.Module, tagset: Vocab, sentence_numerical_vector: torch.LongTensor) -> List[str]:

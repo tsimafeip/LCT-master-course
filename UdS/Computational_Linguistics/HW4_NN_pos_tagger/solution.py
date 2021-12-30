@@ -252,18 +252,19 @@ def train_model(
         epoch_mins, epoch_secs = epoch_time(start_time, end_time)
 
         print()
-        print(f'Epoch: {epoch + 1:02} | Epoch Time: {epoch_mins}m {epoch_secs}s')
+        print(f'Epoch: {epoch:02} | Epoch Time: {epoch_mins}m {epoch_secs}s')
         print(f"Train: Loss {train_loss} | Accuracy {train_accuracy}")
         print(f"Validation: Loss {val_loss} | Accuracy {val_accuracy}")
 
         # saving best checkpoint
         if val_loss < best_val_loss:
-            print(f'SAVING BEST MODEL WITH VAL_LOSS={val_loss}.')
+            print(f'NEW BEST MODEL WITH VAL_LOSS={val_loss}.')
             best_val_loss = val_loss
             best_epoch = epoch
             best_accuracy = val_accuracy
             best_model_state = model_to_train.state_dict()
             if save_best_checkpoint:
+                print(f'SAVING BEST MODEL TO CHECKPOINT...')
                 torch.save(model_to_train.state_dict(), checkpoint_filename)
 
     return best_epoch, best_accuracy, best_val_loss, best_model_state

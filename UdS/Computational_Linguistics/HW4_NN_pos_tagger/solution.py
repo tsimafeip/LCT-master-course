@@ -240,7 +240,6 @@ def train_model(
     optimizer = optimizer_class(model_to_train.parameters(), lr=learning_rate)
     # iterates by epochs
     for epoch in range(1, num_epochs + 1):
-        print(f'Epoch #{epoch}')
         start_time = time.time()
         train_loss, train_accuracy = train_loop(model_to_train, optimizer, loss_function, train_dataloader, epoch=epoch,
                                                 comet_experiment=comet_experiment,
@@ -253,6 +252,7 @@ def train_model(
         epoch_mins, epoch_secs = epoch_time(start_time, end_time)
 
         print()
+        print(f'Epoch: {epoch + 1:02} | Epoch Time: {epoch_mins}m {epoch_secs}s')
         print(f"Train: Loss {train_loss} | Accuracy {train_accuracy}")
         print(f"Validation: Loss {val_loss} | Accuracy {val_accuracy}")
 

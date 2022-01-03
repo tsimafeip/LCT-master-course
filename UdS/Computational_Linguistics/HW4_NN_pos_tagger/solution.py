@@ -115,8 +115,10 @@ def accuracy(gold_tags, prediction_output) -> float:
 
 
 def train_loop(model: nn.Module, optimizer: torch.optim.Optimizer, loss_function,
-               dataloader: DataLoader, epoch: int = 0,
-               comet_experiment: Experiment = None, tokens_transformation_func=None) -> Tuple[float, float]:
+               dataloader: DataLoader, epoch: int = 0, stop_after_n_steps: Optional[int] = None,
+               comet_experiment: Optional[Experiment] = None, 
+               tokens_transformation_func: Optional[Callable[[torch.LongTensor], torch.LongTensor]] = None,
+) -> Tuple[float, float]:
     """
     Runs one complete training epoch, i. e. trains the model on the whole amount of available training data and updates weights.
     :param model: a pytorch model
@@ -140,6 +142,9 @@ def train_loop(model: nn.Module, optimizer: torch.optim.Optimizer, loss_function
             # simple logging to understand the stage of training process inside one epoch
             if (i + 1) % 100 == 0:
                 print(i + 1, end=" ")
+            
+            if stop_after_n_steps and stop_after_n_steps == i:
+                break
 
             # two 1d-vector-like Tensors with the same length
             input_tokens, gold_tags = item[0][0], item[0][1]
@@ -180,7 +185,9 @@ def train_loop(model: nn.Module, optimizer: torch.optim.Optimizer, loss_function
 
 
 def validation_loop(model: nn.Module, loss_function, dataloader: DataLoader, epoch: int = 0,
-                    comet_experiment: Experiment = None, tokens_transformation_func=None) -> Tuple[float, float]:
+                    comet_experiment: Optional[Experiment] = None, stop_after_n_steps: Optional[int] = None,
+                    tokens_transformation_func: Optional[Callable[[torch.LongTensor], torch.LongTensor]] = None,
+) -> Tuple[float, float]:
     """
     Runs one complete validation (test) loop, 
     i. e. validates(tests) the model on the whole amount of available validation (test) data and reports quality metrics.
@@ -226,7 +233,9 @@ def validation_loop(model: nn.Module, loss_function, dataloader: DataLoader, epo
 def train_model(
         model_to_train: nn.Module, optimizer_class,
         loss_function, train_dataloader: DataLoader, dev_dataloader: DataLoader,
-        learning_rate, num_epochs: int,
+        learning_rate: float, num_epochs: int,
+        stop_train_after_n_steps: Optional[int] = None,
+        stop_val_after_n_steps: Optional[int] = None,
         save_best_checkpoint: bool = False,
         checkpoint_filename: Optional[str] = None,
         comet_experiment: Optional[Experiment] = None,
@@ -242,10 +251,10 @@ def train_model(
     for epoch in range(1, num_epochs + 1):
         start_time = time.time()
         train_loss, train_accuracy = train_loop(model_to_train, optimizer, loss_function, train_dataloader, epoch=epoch,
-                                                comet_experiment=comet_experiment,
+                                                comet_experiment=comet_experiment, stop_after_n_steps=stop_train_after_n_steps,
                                                 tokens_transformation_func=embedding_trasformation_func)
         val_loss, val_accuracy = validation_loop(model_to_train, loss_function, dev_dataloader, epoch=epoch,
-                                                 comet_experiment=comet_experiment,
+                                                 comet_experiment=comet_experiment, stop_after_n_steps=stop_val_after_n_steps,
                                                  tokens_transformation_func=embedding_trasformation_func)
 
         end_time = time.time()
@@ -325,3 +334,7 @@ def predict_pos_bert(bert_model: BertPosTagger, sentence: Union[List[str], str],
                                   sentence_numerical_vector=sentence_numerical_vector)
 
     return predicted_tags
+
+def count_parameters(model: nn.Module) -> int:
+    """Returns number of trainable params for the model."""
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)

@@ -1,5 +1,5 @@
 import numpy as np
-from solution_tutor import NeuralNetworkModel
+from solution import NeuralNetworkModel
 
 """
 DO NOT CHANGE CODE IN THIS FILE

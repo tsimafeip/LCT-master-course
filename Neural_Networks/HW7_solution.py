@@ -309,8 +309,9 @@ class NeuralNetworkModel:
                 # updating weights from each iteration's gradients * learning rate
                 # per Algorithm 1
                 loss, grads = self.loss(X_train, y_train, reg=reg)
+                loss_history.append(loss)
 
-                print('Loss', loss)
+                #print('Loss', loss, end=' ')
 
                 self.params = {
                     param_name:(self.params[param_name] - learning_rate*grads[param_name])
@@ -366,7 +367,7 @@ class NeuralNetworkModel:
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         return y_pred
 
-    @staticmethod
-    def find_best_model():
-        # TODO: Implement a function to find a model with most optimal hyperparameters
-        pass
+
+def find_best_model():
+    # TODO: Implement a function to find a model with most optimal hyperparameters
+    pass

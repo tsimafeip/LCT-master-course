@@ -1,4 +1,0 @@
-- This homework is about context-free grammars and CKY parsing. More specifically, I was asked to implement the Cocke-Kasami-Younger (CKY) algorithm for bottom-up CFG parsing, and apply it to the word and the parsing problem of English.
-- HW_3_CKY_parser.ipynb is the main file with code and report. 
-- It is intended to be run via Google Colaboratory using the following [link](https://colab.research.google.com/github/tsimafeip/LCT-master-course/blob/main/UdS/Computational_Linguistics/HW3_CKY_parser/HW_3_CKY_parser.ipynb).
-- Simply execute all cells, required data will be uploaded automatically.

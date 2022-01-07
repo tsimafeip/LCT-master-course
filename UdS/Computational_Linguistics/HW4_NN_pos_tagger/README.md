@@ -1,4 +1,0 @@
-- This homework is about a neural part-of-speech (POS) tagger based on LSTM architecture.
-- HW4.ipynb is the main file with code and report.
-- Simply execute all cells, required data will be uploaded automatically. Please note that it takes quite long for a first time, but later the notebook uses files loaded to local drive.
-- Final quality is ~89%. It is worse than using bigram model, but, possibly, we could improve it utilizing more complex architecture and parameter tuning.

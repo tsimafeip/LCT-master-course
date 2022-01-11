@@ -3,10 +3,12 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import random_split
-from torchvision.utils import make_grid
 import numpy as np
 import matplotlib.pyplot as plt
 
+import copy
+from typing import List, Optional, Dict, Union, Tuple
+import time
 
 class ReshapeTransform:
     def __init__(self, new_size):
@@ -292,9 +294,13 @@ class NeuralNetworkModel:
         """
     
         # Use SGD to optimize the parameters in self.model
-        loss_history = []
+        train_loss_history = []
         train_acc_history = []
         val_acc_history = []
+        val_loss_history = []
+
+        best_val_loss = float('inf')
+        best_model_params = dict()
     
         for it in range(num_epochs):
             epoch_train_acc = []
@@ -309,7 +315,7 @@ class NeuralNetworkModel:
                 # updating weights from each iteration's gradients * learning rate
                 # per Algorithm 1
                 loss, grads = self.loss(X_train, y_train, reg=reg)
-                loss_history.append(loss)
+                train_loss_history.append(loss)
 
                 #print('Loss', loss, end=' ')
 
@@ -326,6 +332,15 @@ class NeuralNetworkModel:
     
             # Every epoch, check train and val accuracy and decay learning rate.
             val_acc_history.append((self.predict(X_val) == y_val.numpy()).mean())
+            val_loss, _ = self.loss(X_val, y_val, reg=0)
+            if val_loss < best_val_loss:
+                if verbose:
+                    print(f'NEW BEST VALIDATION LOSS ON TRAINING {val_loss}, SAVING MODEL PARAMETERS...')
+
+                best_val_loss = val_loss
+                best_model_params = copy.deepcopy(self.params)
+
+            val_loss_history.append(val_loss)
             # Decay learning rate
             learning_rate *= learning_rate_decay
     
@@ -334,12 +349,16 @@ class NeuralNetworkModel:
             if verbose:
                 print(f'Epoch {it + 1} / {num_epochs}:\nTraining Accuracy: {np.mean(epoch_train_acc)}\n'
                       f'Validation Accuracy: {val_acc_history[-1]}\n'
-                      f'Loss: {loss_history[-1]}')
-    
+                      f'Loss: {train_loss_history[-1]}')
+        
+        #updating model_params
+        self.params = best_model_params
+
         return {
-            'loss_history': loss_history,
+            'train_loss_history': train_loss_history,
             'train_acc_history': train_acc_history,
             'val_acc_history': val_acc_history,
+            'val_loss_history': val_loss_history,
         }
 
     def predict(self, X):
@@ -368,6 +387,80 @@ class NeuralNetworkModel:
         return y_pred
 
 
-def find_best_model():
-    # TODO: Implement a function to find a model with most optimal hyperparameters
-    pass
+def draw_simple_plot(data: List[float], x_label: Optional[str] = None, 
+                     y_label: Optional[str] = None, plot_title: Optional[str] = None):
+    """Draws simple line plot of provided data."""
+    x = np.linspace(0, len(data), len(data))
+    plt.plot(x, data)
+
+    if x_label: plt.xlabel(x_label)
+    if y_label: plt.ylabel(y_label)
+    if plot_title: plt.title(plot_title)
+
+    plt.show()
+
+def find_best_model(base_hyperparams: Dict[str, Union[float, int]],
+                    epoch_nums: Optional[List[int]] = None,
+                    batch_sizes: Optional[List[int]] = None,
+                    learning_rates: Optional[List[float]] = None) -> Tuple[NeuralNetworkModel, Dict[str, Union[float, int]]]:
+    """Performs grid search and returns tuple of best trained model and best observed hyperparams."""    
+    best_hyperparams = {}
+
+    if epoch_nums is None:
+        epoch_nums = [base_hyperparams['num_epochs'], ]
+    
+    if batch_sizes is None:
+        batch_sizes = [base_hyperparams['batch_size'], ]
+    
+    if learning_rates is None:
+        learning_rates = [base_hyperparams['learning_rate'], ]
+
+    best_val_loss = float('inf')
+    best_model = None
+
+    for num_epochs in epoch_nums:
+        for batch_size in batch_sizes:
+            train_loader, _, val_loader, _ = get_cifar10_dataset(batch_size=batch_size)
+
+            val_dataset_tensor = next(iter(val_loader))
+            X_val, y_val = val_dataset_tensor[0], val_dataset_tensor[1]
+            
+            for learning_rate in learning_rates:
+                start_time = time.time()
+                print("Testing number of epochs = {}, learning rate = {}, batch_size={}...".format(num_epochs, learning_rate, batch_size))
+
+                model = NeuralNetworkModel(input_size=base_hyperparams['input_size'],
+                                           hidden_size=base_hyperparams['hidden_size'],
+                                           output_size=base_hyperparams['output_size'])
+
+                train_metrics = model.train(train_dataloader=train_loader,
+                                X_val=X_val,
+                                y_val=y_val, 
+                                learning_rate=learning_rate,
+                                learning_rate_decay=base_hyperparams['learning_rate_decay'], 
+                                num_epochs=num_epochs)
+
+                draw_simple_plot(train_metrics['train_loss_history'], x_label='Steps', y_label='Loss', plot_title='Train Loss History')
+                draw_simple_plot(train_metrics['val_loss_history'],  x_label='Epochs', y_label='Loss', plot_title='Validation Loss History')
+                print("--- %s Total seconds elapsed ---" % (time.time() - start_time))
+
+                if best_val_loss > min(train_metrics['val_loss_history']):
+                    best_val_loss = min(train_metrics['val_loss_history'])
+
+                    best_hyperparams['learning_rate'] = learning_rate
+                    best_hyperparams['batch_size'] = batch_size
+                    best_hyperparams['num_epochs'] = num_epochs
+ 
+                    best_model = model
+                    
+                    print("SAVING BEST HYPERPARAMS SET BASED ON VALIDATION LOSS {}...".format(best_val_loss))
+                    print(best_hyperparams)
+    
+    base_hyperparams.update(best_hyperparams)
+
+    return best_model, base_hyperparams
+            
+            
+            
+
+

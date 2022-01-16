@@ -1,0 +1,92 @@
+#!/usr/bin/env python
+
+import os
+import optparse
+import sys
+from collections import defaultdict
+
+from tqdm import tqdm
+
+optparser = optparse.OptionParser()
+optparser.add_option("-d", "--data", dest="train", default="data/hansards", help="Data filename prefix (default=data)")
+optparser.add_option("-e", "--english", dest="english", default="e", help="Suffix of English filename (default=e)")
+optparser.add_option("-f", "--french", dest="french", default="f", help="Suffix of French filename (default=f)")
+optparser.add_option("-n", "--num_sentences", dest="num_sents", default=100000000000, type="int", help="Number of sentences to use for training and alignment")
+(opts, _) = optparser.parse_args()
+# f_data = "%s.%s" % (opts.train, opts.french)
+# e_data = "%s.%s" % (opts.train, opts.english)
+
+TRAIN_SENTENCES_NUM = opts.num_sents # assign -1 to use full training corpus
+#TRAIN_DATA_FOLDER = ['.', 'jhu-mt-hw', 'hw2', 'data']
+TRAIN_DATA_FOLDER = ['.', 'data']
+F_FILE_NAME = 'hansards.f'
+E_FILE_NAME = 'hansards.e'
+
+# sample word to check if we are calculating probabilities correctly on each step
+SANITY_CHECK_WORD = 'the'
+# threshold for double variables comparison
+EPS = 0.00001
+EM_ITERATIONS_NUM = 100
+
+
+path_to_f_data = os.path.join(*TRAIN_DATA_FOLDER, F_FILE_NAME)
+path_to_e_data = os.path.join(*TRAIN_DATA_FOLDER, E_FILE_NAME)
+
+f_e_corpus = []
+e_vocab = set()
+f_vocab = set()
+
+with open(path_to_f_data) as f_file, open(path_to_e_data) as e_file:
+    for i, (f_sentence, e_sentence) in enumerate(zip(f_file, e_file)):
+        if TRAIN_SENTENCES_NUM != -1 and i == TRAIN_SENTENCES_NUM:
+            break
+
+        f_words = f_sentence.strip().split()
+        e_words = e_sentence.strip().split()
+
+        f_vocab.update(f_words)
+        e_vocab.update(e_words)
+        f_e_corpus.append([f_words, e_words])
+
+initial_estimate = {f_word: 1/len(f_vocab) for f_word in f_vocab}
+
+# given the word in English, which foreign word is the most likely alignment
+translation_probabilities = {e_word: initial_estimate for e_word in e_vocab}
+# add null word
+translation_probabilities[None] = initial_estimate
+
+assert abs(sum(translation_probabilities[SANITY_CHECK_WORD].values()) - 1.0) < EPS
+
+for iteration_num in tqdm(range(EM_ITERATIONS_NUM)):
+    pair_counts = defaultdict(int)
+    word_counts = defaultdict(int)
+    # E-Step: Compute expected counts
+    for f_words, e_words in f_e_corpus:
+        for f_word in f_words:
+            # Z is commonly used to denote a normalization term
+            z = sum(translation_probabilities[e_word][f_word] for e_word in e_words)
+            for e_word in e_words:
+                # Compute expected count
+                count = translation_probabilities[e_word][f_word] / z
+                # Increment count of alignments by expected count
+                pair_counts[(f_word, e_word)] += count
+                # Increment marginal count of English word by expected count
+                word_counts[e_word] += count
+    
+    # M-step: Normalize
+    new_translation_probabilities = defaultdict(dict)
+    for (f_word, e_word), pair_count_value in pair_counts.items():
+        new_translation_probabilities[e_word][f_word] = pair_count_value/word_counts[e_word]
+    translation_probabilities = new_translation_probabilities
+
+    assert abs(sum(translation_probabilities[SANITY_CHECK_WORD].values()) - 1.0) < EPS
+
+for (f, e) in f_e_corpus:
+  for (i, f_i) in enumerate(f): 
+    best_j = best_prob = 0
+    for (j, e_j) in enumerate(e):
+        if translation_probabilities[e_j][f_i] > best_prob:
+            best_prob, best_j = translation_probabilities[e_j][f_i], j
+    sys.stdout.write("%i-%i " % (i, best_j))
+        
+  sys.stdout.write("\n")

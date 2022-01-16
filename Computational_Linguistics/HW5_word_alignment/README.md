@@ -1,0 +1,6 @@
+- This homework is about a word alignment using 'IBM Model I' and EM algorithm.
+- HW5.ipynb is the file with report, 'em-align' is a Python script which produces the actual alignment.
+- Simply execute all cells, required data/packages will be uploaded automatically.
+- It is intended to be run via Google Colaboratory using the following [link](https://colab.research.google.com/github/tsimafeip/LCT-master-course/blob/main/Computational_Linguistics/HW5_word_alignment/HW5.ipynb). This notebook installs several additional programs and download data/scripts from git, so Colab will save a local space of your computer.
+- Please note that running EM for 10k training sentences takes ~20min. 
+- Final quality is better than for baseline aligner (AER: 0.412653 vs 0.709249). However, off-the-shelf fast_align, which is the implementation of 'IBM Model II', gives even better AER=0.297512 after only five iterations of EM.

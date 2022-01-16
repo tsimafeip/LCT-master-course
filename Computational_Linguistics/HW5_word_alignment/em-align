@@ -8,16 +8,16 @@ from collections import defaultdict
 from tqdm import tqdm
 
 optparser = optparse.OptionParser()
-optparser.add_option("-d", "--data", dest="train", default="data/hansards", help="Data filename prefix (default=data)")
-optparser.add_option("-e", "--english", dest="english", default="e", help="Suffix of English filename (default=e)")
-optparser.add_option("-f", "--french", dest="french", default="f", help="Suffix of French filename (default=f)")
-optparser.add_option("-n", "--num_sentences", dest="num_sents", default=100000000000, type="int", help="Number of sentences to use for training and alignment")
+optparser.add_option("-n", "--num_sentences", dest="num_sents", default=-1, type="int", 
+                    help="""Number of sentences to use for training and alignment. 
+                    If not set, then all available sentences will be used.""")
+optparser.add_option("-i", "--em_iterations", dest="em_iterations", default=100, type="int", 
+                    help="Number of iterations for EM algorithm.")                    
 (opts, _) = optparser.parse_args()
-# f_data = "%s.%s" % (opts.train, opts.french)
-# e_data = "%s.%s" % (opts.train, opts.english)
 
-TRAIN_SENTENCES_NUM = opts.num_sents # assign -1 to use full training corpus
-#TRAIN_DATA_FOLDER = ['.', 'jhu-mt-hw', 'hw2', 'data']
+TRAIN_SENTENCES_NUM = opts.num_sents
+
+# I have decided to hardcode data_folder and filenames for simplicity sake
 TRAIN_DATA_FOLDER = ['.', 'data']
 F_FILE_NAME = 'hansards.f'
 E_FILE_NAME = 'hansards.e'
@@ -26,7 +26,7 @@ E_FILE_NAME = 'hansards.e'
 SANITY_CHECK_WORD = 'the'
 # threshold for double variables comparison
 EPS = 0.00001
-EM_ITERATIONS_NUM = 100
+EM_ITERATIONS_NUM = opts.em_iterations
 
 
 path_to_f_data = os.path.join(*TRAIN_DATA_FOLDER, F_FILE_NAME)
@@ -52,8 +52,6 @@ initial_estimate = {f_word: 1/len(f_vocab) for f_word in f_vocab}
 
 # given the word in English, which foreign word is the most likely alignment
 translation_probabilities = {e_word: initial_estimate for e_word in e_vocab}
-# add null word
-translation_probabilities[None] = initial_estimate
 
 assert abs(sum(translation_probabilities[SANITY_CHECK_WORD].values()) - 1.0) < EPS
 

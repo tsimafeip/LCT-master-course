@@ -7,15 +7,25 @@ from collections import defaultdict
 
 from tqdm import tqdm
 from typing import List, Tuple, Set, Dict, Optional
+import json
 
 optparser = optparse.OptionParser()
-optparser.add_option("-n", "--num_sentences", dest="num_sents", default=-1, type="int", 
-                    help="""Number of sentences to use for training and alignment. 
+optparser.add_option("-n", "--num_sentences", dest="num_sents", default=-1, type="int",
+                     help="""Number of sentences to use for training and alignment. 
                     If not set, then all available sentences will be used.""")
-optparser.add_option("-i", "--em_iterations", dest="em_iterations", default=100, type="int", 
-                    help="Number of iterations for EM algorithm.")
-optparser.add_option("-b", "--bilateral", dest="bilateral_model", default=1, type="int", 
-                    help="Binary flag to train bilateral model or not. Bilateral model improves precision, but drops recall.")                   
+optparser.add_option("-i", "--em_iterations", dest="em_iterations", default=100, type="int",
+                     help="Number of iterations for EM algorithm.")
+optparser.add_option("-b", "--bilateral", dest="bilateral_model", default=1, type="int",
+                     help="""Binary flag to train bilateral model or not. 
+                          "Bilateral model improves precision, but drops recall.""")
+optparser.add_option("-s", "--save", dest="save_models", default=0, type="int",
+                     help="Binary flag to save trained model(s) or not.")
+optparser.add_option("-e", "--model_e_f", dest="model_e_f_path", default=None, type="str",
+                     help="Path to trained English-French model.")
+optparser.add_option("-f", "--model_f_e", dest="model_f_e_path", default=None, type="str",
+                     help="Path to trained French-English model.")
+optparser.add_option("-l", "--load_models", dest="load_models", default=0, type="int",
+                     help="Binary flag to load trained model(s) or not. Works only if respective paths were provided.")
 (opts, _) = optparser.parse_args()
 
 TRAIN_SENTENCES_NUM = opts.num_sents
@@ -31,7 +41,6 @@ F_SANITY_CHECK_WORD = 'la'
 # threshold for double variables comparison
 EPS = 0.00001
 EM_ITERATIONS_NUM = opts.em_iterations
-
 
 path_to_f_data = os.path.join(*TRAIN_DATA_FOLDER, F_FILE_NAME)
 path_to_e_data = os.path.join(*TRAIN_DATA_FOLDER, E_FILE_NAME)
@@ -53,8 +62,7 @@ with open(path_to_f_data) as f_file, open(path_to_e_data) as e_file:
         f_e_corpus.append((f_words, e_words))
 
 
-
-def train_ibm_model(source_vocab: Set[str], target_vocab: Set[str], corpus: List[Tuple[List[str], List[str]]], 
+def train_ibm_model(source_vocab: Set[str], target_vocab: Set[str], corpus: List[Tuple[List[str], List[str]]],
                     sanity_check_word: Optional[str] = None, reverse_corpus: bool = False) -> Dict[str, Dict[str, int]]:
     """
     Trains IBM Model I using passed source-target data.
@@ -79,14 +87,14 @@ def train_ibm_model(source_vocab: Set[str], target_vocab: Set[str], corpus: List
     Dict[str, Dict[str, int]]
         IBM Model I with word alignment probabilities.
     """
-    initial_estimate = {source_word: 1/len(source_vocab) for source_word in source_vocab}
+    initial_estimate = {source_word: 1 / len(source_vocab) for source_word in source_vocab}
 
     # given the word in target, which source word is the most likely alignment
     translation_probabilities = {target_word: initial_estimate for target_word in target_vocab}
 
     if sanity_check_word:
         assert abs(sum(translation_probabilities[sanity_check_word].values()) - 1.0) < EPS
-    
+
     for _ in tqdm(range(EM_ITERATIONS_NUM)):
         pair_counts = defaultdict(int)
         word_counts = defaultdict(int)
@@ -94,7 +102,7 @@ def train_ibm_model(source_vocab: Set[str], target_vocab: Set[str], corpus: List
         for f_words, e_words in corpus:
             if reverse_corpus:
                 e_words, f_words = f_words, e_words
-                
+
             for f_word in f_words:
                 # Z is commonly used to denote a normalization term
                 z = sum(translation_probabilities[e_word][f_word] for e_word in e_words)
@@ -105,31 +113,50 @@ def train_ibm_model(source_vocab: Set[str], target_vocab: Set[str], corpus: List
                     pair_counts[(f_word, e_word)] += count
                     # Increment marginal count of English word by expected count
                     word_counts[e_word] += count
-        
+
         # M-step: Normalize
         new_translation_probabilities = defaultdict(dict)
         for (f_word, e_word), pair_count_value in pair_counts.items():
-            new_translation_probabilities[e_word][f_word] = pair_count_value/word_counts[e_word]
+            new_translation_probabilities[e_word][f_word] = pair_count_value / word_counts[e_word]
         translation_probabilities = new_translation_probabilities
 
         if sanity_check_word:
             assert abs(sum(translation_probabilities[sanity_check_word].values()) - 1.0) < EPS
-    
+
     return translation_probabilities
 
 
-translation_probabilities_e_to_f = train_ibm_model(
-    source_vocab=f_vocab, target_vocab=e_vocab, 
-    corpus=f_e_corpus, sanity_check_word=ENG_SANITY_CHECK_WORD,
-)
+if opts.load_models and opts.model_e_f_path:
+    # load saved model
+    with open(opts.model_e_f_path, 'r') as f:
+        translation_probabilities_e_to_f = json.load(f)
+else:
+    # train from scratch
+    translation_probabilities_e_to_f = train_ibm_model(
+        source_vocab=f_vocab, target_vocab=e_vocab,
+        corpus=f_e_corpus, sanity_check_word=ENG_SANITY_CHECK_WORD,
+    )
 
+    if opts.save_models:
+        with open(f"../../IBM_I_model_e_to_f_{opts.em_iterations}_{TRAIN_SENTENCES_NUM}.json", 'w') as f:
+            json.dump(translation_probabilities_e_to_f, f)
+
+translation_probabilities_f_to_e = None
 # train target-source model
 if opts.bilateral_model:
-    translation_probabilities_f_to_e = train_ibm_model(
-        source_vocab=e_vocab, target_vocab=f_vocab, 
-        corpus=f_e_corpus, sanity_check_word=F_SANITY_CHECK_WORD, 
-        reverse_corpus=True,
-    )
+    if opts.load_models and opts.model_f_e_path:
+        # load saved model
+        with open(opts.model_f_e_path, 'r') as f:
+            translation_probabilities_f_to_e = json.load(f)
+    else:
+        translation_probabilities_f_to_e = train_ibm_model(
+            source_vocab=e_vocab, target_vocab=f_vocab,
+            corpus=f_e_corpus, sanity_check_word=F_SANITY_CHECK_WORD,
+            reverse_corpus=True,
+        )
+        if opts.save_models:
+            with open(f"../../IBM_I_model_f_to_e_{opts.em_iterations}_{TRAIN_SENTENCES_NUM}.json", 'w') as f:
+                json.dump(translation_probabilities_f_to_e, f)
 
 # decoding
 for (f, e) in f_e_corpus:
@@ -143,9 +170,9 @@ for (f, e) in f_e_corpus:
             if translation_probabilities_e_to_f[e_j][f_i] > best_prob:
                 best_prob, best_j = translation_probabilities_e_to_f[e_j][f_i], j
         i_to_j.append((i, best_j))
-    
+
     # combine with target-source model to increase precision
-    if opts.bilateral_model:
+    if opts.bilateral_model and translation_probabilities_f_to_e:
         j_to_i = set()
 
         # basically, the same as above, just with swapped english and french sides
@@ -154,9 +181,9 @@ for (f, e) in f_e_corpus:
             for (i, f_i) in enumerate(f):
                 if translation_probabilities_f_to_e[f_i][e_j] > best_prob:
                     best_prob, best_i = translation_probabilities_f_to_e[f_i][e_j], i
-            
+
             j_to_i.add((j, best_i))
-        
+
         bilateral_intersection_res = [(i, best_j) for i, best_j in i_to_j if (best_j, i) in j_to_i]
 
     # fallback to oneside model in case of empty bilateral_intersection_res or only source-target model available 
@@ -165,5 +192,5 @@ for (f, e) in f_e_corpus:
 
     for i, best_j in bilateral_intersection_res:
         sys.stdout.write("%i-%i " % (i, best_j))
-        
+
     sys.stdout.write("\n")

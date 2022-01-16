@@ -6,13 +6,16 @@ import sys
 from collections import defaultdict
 
 from tqdm import tqdm
+from typing import List, Tuple, Set, Dict, Optional
 
 optparser = optparse.OptionParser()
 optparser.add_option("-n", "--num_sentences", dest="num_sents", default=-1, type="int", 
                     help="""Number of sentences to use for training and alignment. 
                     If not set, then all available sentences will be used.""")
 optparser.add_option("-i", "--em_iterations", dest="em_iterations", default=100, type="int", 
-                    help="Number of iterations for EM algorithm.")                    
+                    help="Number of iterations for EM algorithm.")
+optparser.add_option("-b", "--bilateral", dest="bilateral_model", default=1, type="int", 
+                    help="Binary flag to train bilateral model or not. Bilateral model improves precision, but drops recall.")                   
 (opts, _) = optparser.parse_args()
 
 TRAIN_SENTENCES_NUM = opts.num_sents
@@ -23,7 +26,8 @@ F_FILE_NAME = 'hansards.f'
 E_FILE_NAME = 'hansards.e'
 
 # sample word to check if we are calculating probabilities correctly on each step
-SANITY_CHECK_WORD = 'the'
+ENG_SANITY_CHECK_WORD = 'the'
+F_SANITY_CHECK_WORD = 'la'
 # threshold for double variables comparison
 EPS = 0.00001
 EM_ITERATIONS_NUM = opts.em_iterations
@@ -46,45 +50,120 @@ with open(path_to_f_data) as f_file, open(path_to_e_data) as e_file:
 
         f_vocab.update(f_words)
         e_vocab.update(e_words)
-        f_e_corpus.append([f_words, e_words])
+        f_e_corpus.append((f_words, e_words))
 
-initial_estimate = {f_word: 1/len(f_vocab) for f_word in f_vocab}
 
-# given the word in English, which foreign word is the most likely alignment
-translation_probabilities = {e_word: initial_estimate for e_word in e_vocab}
 
-assert abs(sum(translation_probabilities[SANITY_CHECK_WORD].values()) - 1.0) < EPS
+def train_ibm_model(source_vocab: Set[str], target_vocab: Set[str], corpus: List[Tuple[List[str], List[str]]], 
+                    sanity_check_word: Optional[str] = None, reverse_corpus: bool = False) -> Dict[str, Dict[str, int]]:
+    """
+    Trains IBM Model I using passed source-target data.
 
-for iteration_num in tqdm(range(EM_ITERATIONS_NUM)):
-    pair_counts = defaultdict(int)
-    word_counts = defaultdict(int)
-    # E-Step: Compute expected counts
-    for f_words, e_words in f_e_corpus:
-        for f_word in f_words:
-            # Z is commonly used to denote a normalization term
-            z = sum(translation_probabilities[e_word][f_word] for e_word in e_words)
-            for e_word in e_words:
-                # Compute expected count
-                count = translation_probabilities[e_word][f_word] / z
-                # Increment count of alignments by expected count
-                pair_counts[(f_word, e_word)] += count
-                # Increment marginal count of English word by expected count
-                word_counts[e_word] += count
+    Parameters
+    ----------
+    source_vocab : Set[str]
+        Vocabulary for source language.
+    target_vocab : Set[str]
+        Vocabulary for target language.
+    corpus : List[Tuple[List[str], List[str]]]
+        Data corpus of parallel sentences for training.
+    sanity_check_word : Optional[str]
+        Sample word to check if we are calculating probabilities correctly on each step.
+        Usually, the most basic word of language like 'the' for English or 'la' for French.
+    reverse_corpus : bool
+        Flag to treat corpus as reversed: swap source and target language in corpus.
+        By default has False value, so no reversing implied.
+
+    Returns
+    -------
+    Dict[str, Dict[str, int]]
+        IBM Model I with word alignment probabilities.
+    """
+    initial_estimate = {source_word: 1/len(source_vocab) for source_word in source_vocab}
+
+    # given the word in target, which source word is the most likely alignment
+    translation_probabilities = {target_word: initial_estimate for target_word in target_vocab}
+
+    if sanity_check_word:
+        assert abs(sum(translation_probabilities[sanity_check_word].values()) - 1.0) < EPS
     
-    # M-step: Normalize
-    new_translation_probabilities = defaultdict(dict)
-    for (f_word, e_word), pair_count_value in pair_counts.items():
-        new_translation_probabilities[e_word][f_word] = pair_count_value/word_counts[e_word]
-    translation_probabilities = new_translation_probabilities
-
-    assert abs(sum(translation_probabilities[SANITY_CHECK_WORD].values()) - 1.0) < EPS
-
-for (f, e) in f_e_corpus:
-  for (i, f_i) in enumerate(f): 
-    best_j = best_prob = 0
-    for (j, e_j) in enumerate(e):
-        if translation_probabilities[e_j][f_i] > best_prob:
-            best_prob, best_j = translation_probabilities[e_j][f_i], j
-    sys.stdout.write("%i-%i " % (i, best_j))
+    for _ in tqdm(range(EM_ITERATIONS_NUM)):
+        pair_counts = defaultdict(int)
+        word_counts = defaultdict(int)
+        # E-Step: Compute expected counts
+        for f_words, e_words in corpus:
+            if reverse_corpus:
+                e_words, f_words = f_words, e_words
+                
+            for f_word in f_words:
+                # Z is commonly used to denote a normalization term
+                z = sum(translation_probabilities[e_word][f_word] for e_word in e_words)
+                for e_word in e_words:
+                    # Compute expected count
+                    count = translation_probabilities[e_word][f_word] / z
+                    # Increment count of alignments by expected count
+                    pair_counts[(f_word, e_word)] += count
+                    # Increment marginal count of English word by expected count
+                    word_counts[e_word] += count
         
-  sys.stdout.write("\n")
+        # M-step: Normalize
+        new_translation_probabilities = defaultdict(dict)
+        for (f_word, e_word), pair_count_value in pair_counts.items():
+            new_translation_probabilities[e_word][f_word] = pair_count_value/word_counts[e_word]
+        translation_probabilities = new_translation_probabilities
+
+        if sanity_check_word:
+            assert abs(sum(translation_probabilities[sanity_check_word].values()) - 1.0) < EPS
+    
+    return translation_probabilities
+
+
+translation_probabilities_e_to_f = train_ibm_model(
+    source_vocab=f_vocab, target_vocab=e_vocab, 
+    corpus=f_e_corpus, sanity_check_word=ENG_SANITY_CHECK_WORD,
+)
+
+# train target-source model
+if opts.bilateral_model:
+    translation_probabilities_f_to_e = train_ibm_model(
+        source_vocab=e_vocab, target_vocab=f_vocab, 
+        corpus=f_e_corpus, sanity_check_word=F_SANITY_CHECK_WORD, 
+        reverse_corpus=True,
+    )
+
+# decoding
+for (f, e) in f_e_corpus:
+    bilateral_intersection_res = []
+    i_to_j = list()
+
+    # source-target model
+    for (i, f_i) in enumerate(f):
+        best_j = best_prob = 0
+        for (j, e_j) in enumerate(e):
+            if translation_probabilities_e_to_f[e_j][f_i] > best_prob:
+                best_prob, best_j = translation_probabilities_e_to_f[e_j][f_i], j
+        i_to_j.append((i, best_j))
+    
+    # combine with target-source model to increase precision
+    if opts.bilateral_model:
+        j_to_i = set()
+
+        # basically, the same as above, just with swapped english and french sides
+        for (j, e_j) in enumerate(e):
+            best_i = best_prob = 0
+            for (i, f_i) in enumerate(f):
+                if translation_probabilities_f_to_e[f_i][e_j] > best_prob:
+                    best_prob, best_i = translation_probabilities_f_to_e[f_i][e_j], i
+            
+            j_to_i.add((j, best_i))
+        
+        bilateral_intersection_res = [(i, best_j) for i, best_j in i_to_j if (best_j, i) in j_to_i]
+
+    # fallback to oneside model in case of empty bilateral_intersection_res or only source-target model available 
+    if not bilateral_intersection_res:
+        bilateral_intersection_res = i_to_j
+
+    for i, best_j in bilateral_intersection_res:
+        sys.stdout.write("%i-%i " % (i, best_j))
+        
+    sys.stdout.write("\n")

@@ -3,7 +3,7 @@ import wget
 
 import torch
 from torch import nn
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 from typing import List, Tuple, Union, Dict, Optional
 from tqdm import tqdm
@@ -131,37 +131,6 @@ def encode_sliding_data(
     return res_vector
 
 
-class DiacriticFFNN(nn.Module):
-    def __init__(self, input_size: int, output_size: int, hidden_size: int):
-        super().__init__()
-
-        self.linear_relu_stack = nn.Sequential(
-            nn.Linear(input_size, hidden_size),
-            nn.ReLU(),
-            # nn.Linear(hidden_size * 2, hidden_size),
-            # nn.ReLU(),
-            nn.Linear(hidden_size, output_size),
-        )
-
-        self.num_classes = output_size
-
-    def forward(self, x: Union[torch.Tensor, np.ndarray]):
-        logits = self.linear_relu_stack(x)
-        return logits
-
-
-def get_ffnn_model_and_optimizer(input_size: int, output_size: int,
-                                 hidden_size: int, learning_rate: float = 1e-5,
-                                 ) -> Tuple[nn.Module, torch.optim.Optimizer]:
-    """Defines model from scratch and optimizer based on it."""
-    model = DiacriticFFNN(input_size=input_size,
-                          hidden_size=hidden_size,
-                          output_size=output_size)
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-
-    return model.to(DEVICE), optimizer
-
-
 class CustomSlidingDataset(Dataset):
     def __init__(self, source_x: List[str], source_y: List[int]):
         self.targets = torch.LongTensor(source_y).to(DEVICE)
@@ -274,3 +243,38 @@ def validation_loop_ffnn(dataloader: torch.utils.data.DataLoader,
     }
 
     return result_metrics
+
+
+def run_train_and_val(model: nn.Module, train_dataloader: DataLoader, validation_dataloader: DataLoader,
+                      epochs: int, learning_rate: float = 1e-5):
+    best_val_loss = float('inf')
+    best_metrics = dict()
+
+    model = model.to(DEVICE)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    loss_fn = nn.CrossEntropyLoss()
+
+    for cur_epoch in range(epochs):
+        print(cur_epoch, end=" ")
+        train_metrics = train_loop_ffnn(train_dataloader, model, loss_fn, optimizer)
+        val_metrics = validation_loop_ffnn(validation_dataloader, model, loss_fn)
+
+        # saving best checkpoint
+        if val_metrics['loss'] < best_val_loss:
+            best_val_loss = val_metrics['loss']
+            best_epoch = cur_epoch
+            best_metrics = val_metrics
+            # print(f'SAVING BEST MODEL WITH VAL_LOSS={best_val_loss}.')
+            torch.save(model.state_dict(), 'best-model.pt')
+
+        if (cur_epoch + 1) % 2 == 0:
+            print()
+            print(f"Epoch {cur_epoch + 1}\n-------------------------------")
+            print('Train metrics: ', train_metrics)
+            print('Validation metrics: ', val_metrics)
+            print("\n-------------------------------")
+
+    print("Done!")
+
+    return best_val_loss, best_metrics

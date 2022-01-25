@@ -41,13 +41,14 @@ F_SANITY_CHECK_WORD = 'la'
 # threshold for double variables comparison
 EPS = 0.00001
 EM_ITERATIONS_NUM = opts.em_iterations
+NULL_WORD = "NULL_WORD"
 
 path_to_f_data = os.path.join(*TRAIN_DATA_FOLDER, F_FILE_NAME)
 path_to_e_data = os.path.join(*TRAIN_DATA_FOLDER, E_FILE_NAME)
 
 f_e_corpus = []
-e_vocab = set()
-f_vocab = set()
+e_vocab = {NULL_WORD}
+f_vocab = {NULL_WORD}
 
 with open(path_to_f_data) as f_file, open(path_to_e_data) as e_file:
     for i, (f_sentence, e_sentence) in enumerate(zip(f_file, e_file)):
@@ -59,7 +60,7 @@ with open(path_to_f_data) as f_file, open(path_to_e_data) as e_file:
 
         f_vocab.update(f_words)
         e_vocab.update(e_words)
-        f_e_corpus.append((f_words, e_words))
+        f_e_corpus.append(([NULL_WORD]+f_words, [NULL_WORD]+e_words))
 
 
 def train_ibm_model(source_vocab: Set[str], target_vocab: Set[str], corpus: List[Tuple[List[str], List[str]]],
@@ -103,7 +104,11 @@ def train_ibm_model(source_vocab: Set[str], target_vocab: Set[str], corpus: List
             if reverse_corpus:
                 e_words, f_words = f_words, e_words
 
-            for f_word in f_words:
+            for i, f_word in enumerate(f_words):
+                # skip null word
+                if i == 0:
+                    continue
+
                 # Z is commonly used to denote a normalization term
                 z = sum(translation_probabilities[e_word][f_word] for e_word in e_words)
                 for e_word in e_words:
@@ -159,30 +164,41 @@ if opts.bilateral_model:
                 json.dump(translation_probabilities_f_to_e, f)
 
 # decoding
-for (f, e) in f_e_corpus:
+for (f_words, e_words) in f_e_corpus:
     bilateral_intersection_res = []
     i_to_j = list()
 
     # source-target model
-    for (i, f_i) in enumerate(f):
+    for (i, f_i) in enumerate(f_words):
+        # skip NULL WORD
+        if i == 0:
+            continue
         best_j = best_prob = 0
-        for (j, e_j) in enumerate(e):
+        for (j, e_j) in enumerate(e_words):
             if translation_probabilities_e_to_f[e_j][f_i] > best_prob:
                 best_prob, best_j = translation_probabilities_e_to_f[e_j][f_i], j
-        i_to_j.append((i, best_j))
+        
+        # no alignment for NULL_WORD
+        if best_j != 0:
+            i_to_j.append((i-1, best_j-1))
 
     # combine with target-source model to increase precision
     if opts.bilateral_model and translation_probabilities_f_to_e:
         j_to_i = set()
 
         # basically, the same as above, just with swapped english and french sides
-        for (j, e_j) in enumerate(e):
+        for (j, e_j) in enumerate(e_words):
+            if j == 0:
+                continue
+
             best_i = best_prob = 0
-            for (i, f_i) in enumerate(f):
+            for (i, f_i) in enumerate(f_words):
                 if translation_probabilities_f_to_e[f_i][e_j] > best_prob:
                     best_prob, best_i = translation_probabilities_f_to_e[f_i][e_j], i
-
-            j_to_i.add((j, best_i))
+            
+            # no alignment for NULL_WORD
+            if best_i != 0:
+                j_to_i.add((j-1, best_i-1))
 
         bilateral_intersection_res = [(i, best_j) for i, best_j in i_to_j if (best_j, i) in j_to_i]
 

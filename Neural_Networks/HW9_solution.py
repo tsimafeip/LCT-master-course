@@ -176,6 +176,7 @@ def train_loop_ffnn(dataloader: torch.utils.data.DataLoader,
     correct_labels = total_labels = 0
 
     avg_loss = 0
+    model.train()
     for batch_id, (x_item, gold_label_tensor) in enumerate(tqdm(dataloader)):
         # Compute prediction and loss
         pred_output = model(x_item)
@@ -218,7 +219,7 @@ def validation_loop_ffnn(dataloader: torch.utils.data.DataLoader,
 
     predicted_labels_counter = defaultdict(int)
     true_labels_counter = defaultdict(int)
-
+    model.eval()
     with torch.no_grad():
         for batch_id, (x_item, gold_label_tensor) in enumerate(tqdm(dataloader)):
             pred_output = model(x_item)

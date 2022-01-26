@@ -1,4 +1,5 @@
 import os
+import random
 import wget
 
 import torch
@@ -373,23 +374,24 @@ class DiacriticsRNN(nn.Module):
                  input_size: int,
                  hidden_size: int,
                  output_size: int,
-                 lstm_layers_num: int = 1,
+                 lstm_layers_num: int = 2,
                  bidirectional: bool = True,
                  dropout: float = 0):
         # Initializes internal Module state.
         super().__init__()
 
-        # here we create LSTM layer that mostly defines the architecture of the whole RNN
-        self.lstm = nn.LSTM(input_size, hidden_size,
-                            batch_first=True,
-                            num_layers=lstm_layers_num,
-                            bidirectional=bidirectional)
-
-        # final layer is used for transforming vector of hidden_size to the vector of the required output length
-        self.final_linear = nn.Linear(hidden_size * 2 if bidirectional else hidden_size, output_size)
-
         # dropout layer to regulize training and avoid overfitting
         self.dropout = nn.Dropout(dropout)
+
+        self.rnn = nn.LSTM(
+            input_size=input_size, hidden_size=hidden_size,
+            num_layers=lstm_layers_num, bidirectional=bidirectional, batch_first=True
+        )
+        self.classification = nn.Sequential(
+            nn.Linear(hidden_size * 2, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, output_size),
+        )
 
     # forward function
     def forward(self, embedded_input: torch.FloatTensor):
@@ -407,37 +409,52 @@ class DiacriticsRNN(nn.Module):
         # lstm_output has two possible shapes:
         # (1, sequence_len, hidden_size) for unidirectional LSTM model
         # (1, sequence_len, 2*hidden_size) for bidirectional LSTM model
-        lstm_output, _ = self.lstm(embedded_input)
+        lstm_output, _ = self.rnn(embedded_input)
 
         # predictions has shape (1, sequence_len, num_classes)
-        predictions = self.final_linear(self.dropout(lstm_output))
+        predictions = self.classification(self.dropout(lstm_output))
 
         # reshaping to remove artificial batch dimension
         return predictions.view(sequence_length, -1)
 
 
 def train_loop_rnn(x_data: List[torch.FloatTensor], y_data: List[torch.LongTensor],
-                   model: nn.Module,
+                   model: DiacriticsRNN,
                    loss_fn,
                    optimizer: torch.optim.Optimizer) -> Dict[str, float]:
     """Train loop function."""
     assert len(x_data) == len(y_data)
+
+    dataset_size = len(x_data)
 
     predicted_labels_counter = defaultdict(int)
     true_labels_counter = defaultdict(int)
 
     correct_labels = total_labels = 0
 
-    avg_loss = 0
-    model.train()
-    for batch_id, (x_tensor, gold_label_tensor) in enumerate(tqdm(zip(x_data, y_data))):
+    RNN_BATCH_SIZE = 128
+
+    loss = avg_loss = 0
+    optimizer.zero_grad()
+
+    shuffled_data = random.sample(list(zip(x_data, y_data)), dataset_size)
+    
+    for batch_id, (x_tensor, gold_label_tensor) in enumerate(tqdm(shuffled_data)):
+        model.train()
         # Compute prediction and loss
         pred_output = model(x_tensor)
-        loss = loss_fn(pred_output, gold_label_tensor)
+        loss += loss_fn(pred_output, gold_label_tensor)
 
-        loss.backward()
-        optimizer.step()
         optimizer.zero_grad()
+
+        if (batch_id + 1) % RNN_BATCH_SIZE == 0 or batch_id + 1 == dataset_size:
+            avg_loss += loss.item()
+            loss /= RNN_BATCH_SIZE
+            
+            loss.backward()
+            optimizer.step()
+
+            loss = 0
 
         local_correct = count_correct_labels(
             pred_output=pred_output, gold_output=gold_label_tensor,
@@ -447,9 +464,9 @@ def train_loop_rnn(x_data: List[torch.FloatTensor], y_data: List[torch.LongTenso
 
         correct_labels += local_correct
         total_labels += gold_label_tensor.size(0)
-        avg_loss += loss.item()
+        
 
-    avg_loss /= len(x_data)
+    avg_loss /= dataset_size
     accuracy = correct_labels / total_labels
 
     result_metrics = {
@@ -500,13 +517,16 @@ def validation_loop_rnn(x_data: List[torch.FloatTensor], y_data: List[torch.Long
     return result_metrics
 
 
-def run_train_and_val_rnn(model: nn.Module, x_train: List[torch.FloatTensor], y_train: List[torch.LongTensor],
+def run_train_and_val_rnn(model: DiacriticsRNN, x_train: List[torch.FloatTensor], y_train: List[torch.LongTensor],
                           x_val: List[torch.FloatTensor], y_val: List[torch.LongTensor],
-                          epochs: int, path_to_best_model_file: str = 'best-rnn-model.pt', learning_rate: float = 1e-5):
+                          epochs: int, path_to_best_model_file: str = 'best-rnn-model.pt', learning_rate: float = 1e-3):
     best_epoch = best_val_loss = float('inf')
     best_metrics = dict()
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(
+            list(model.rnn.parameters()) +
+            list(model.classification.parameters()),
+            lr=learning_rate)
 
     loss_fn = nn.CrossEntropyLoss()
 

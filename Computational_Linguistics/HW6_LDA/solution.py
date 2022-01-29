@@ -127,7 +127,7 @@ class DataHelper:
         imported_data_helper.topic_word_counter = [Counter() for _ in range(imported_data_helper.NUM_OF_TOPICS)]
         for word_id, word_topic_counter in enumerate(imported_data_helper.word_topic_counters):
             for topic_id, topic_count in word_topic_counter.items():
-                imported_data_helper.topic_word_counter[topic_id][word_id] += topic_count
+                imported_data_helper.topic_word_counter[int(topic_id)][word_id] += topic_count
 
         return imported_data_helper
         

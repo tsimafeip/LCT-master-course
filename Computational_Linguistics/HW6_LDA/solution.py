@@ -77,10 +77,6 @@ class DataHelper:
 
         # will be populated after training on call of one 'get_most_popular_words_per_topic' method
         self.topic_word_counter = [Counter() for _ in range(self.NUM_OF_TOPICS)]
-
-    @classmethod
-    def get_main_attribute_names(cls) -> List[str]:
-        return ['word_topic_counters', 'vocab', 'document_topic_counters', 'corpus_topic_distribution', 'topic_counter']
     
     def increase_topic_count_and_change_topic(self, *, corpus_id: int, word_id: int, document_id: int, topic_id: int):
         assert corpus_id < self.CORPUS_SIZE
@@ -101,6 +97,9 @@ class DataHelper:
         top_words = [self.vocab[word_id] for word_id, word_count in self.topic_word_counter[topic_id].most_common()[:top_count]]
         return top_words
 
+    @classmethod
+    def get_main_attribute_names(cls) -> List[str]:
+        return ['word_topic_counters', 'vocab', 'document_topic_counters', 'corpus_topic_distribution', 'topic_counter']
 
     def export_trained_helper(self) -> str:
         unique_timestamp = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
@@ -120,6 +119,12 @@ class DataHelper:
             with open(os.path.join(import_folder, f'{attr_name}.json'), 'r') as json_file:
                 attr_value = json.load(json_file)
                 imported_data_helper.__setattr__(attr_name, attr_value)
+
+        # reset pseudoconstants
+        imported_data_helper.NUM_OF_TOPICS = len(imported_data_helper.topic_counter)
+        imported_data_helper.NUM_OF_DOCS = len(imported_data_helper.document_topic_counters)
+        imported_data_helper.CORPUS_SIZE = len(imported_data_helper.corpus_topic_distribution)
+        imported_data_helper.VOCAB_SIZE = len(imported_data_helper.vocab)
 
         return imported_data_helper
         

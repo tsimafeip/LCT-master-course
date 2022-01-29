@@ -54,8 +54,6 @@ class DataHelper:
         self.word_document_corpus = self._create_word_document_corpus()
         self.document_to_word_count = [len(words) for words in self._document_id_to_words]
 
-        # create set of pseudo constants
-        self.NUM_OF_TOPICS = num_of_topics
         self.NUM_OF_DOCS = len(_doc_id_to_words)
         self.CORPUS_SIZE = len(self.word_document_corpus)
         self.VOCAB_SIZE = len(self.vocab)
@@ -120,11 +118,16 @@ class DataHelper:
                 attr_value = json.load(json_file)
                 imported_data_helper.__setattr__(attr_name, attr_value)
 
-        # reset pseudoconstants
+        # reset pseudoconstants and some helper attributes
         imported_data_helper.NUM_OF_TOPICS = len(imported_data_helper.topic_counter)
         imported_data_helper.NUM_OF_DOCS = len(imported_data_helper.document_topic_counters)
         imported_data_helper.CORPUS_SIZE = len(imported_data_helper.corpus_topic_distribution)
         imported_data_helper.VOCAB_SIZE = len(imported_data_helper.vocab)
+
+        imported_data_helper.topic_word_counter = [Counter() for _ in range(imported_data_helper.NUM_OF_TOPICS)]
+        for word_id, word_topic_counter in enumerate(imported_data_helper.word_topic_counters):
+            for topic_id, topic_count in word_topic_counter.items():
+                imported_data_helper.topic_word_counter[topic_id][word_id] += topic_count
 
         return imported_data_helper
         

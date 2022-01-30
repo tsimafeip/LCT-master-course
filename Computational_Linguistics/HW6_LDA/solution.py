@@ -199,15 +199,14 @@ class DataHelper:
     @staticmethod
     def import_trained_helper(path_to_model_file: str, 
                               base_data_helper: Optional['DataHelper'] = None, 
-                              path_to_sorce_data: Optional[str] = None,
+                              path_to_source_data: Optional[str] = None,
     ) -> 'DataHelper':
         """Deserializes DataHelper from json."""
-        if base_data_helper is None and path_to_sorce_data is None:
-            raise Exception('Either base_data_helper or path_to_sorce_data must be specified')
+        if base_data_helper is None and path_to_source_data is None:
+            raise Exception('Either base_data_helper or path_to_source_data must be specified')
         
         if base_data_helper is None:
-            base_data_helper = DataHelper(path_to_sorce_data)
-
+            base_data_helper = DataHelper(path_to_source_data)
         
         with open(path_to_model_file, 'r') as json_file:
             model_data = json.load(json_file)

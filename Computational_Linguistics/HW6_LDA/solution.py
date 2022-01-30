@@ -3,10 +3,9 @@ from collections import Counter, defaultdict
 from datetime import datetime
 
 import json
-import time
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 from tqdm import tqdm
 import pyLDAvis
 
@@ -14,9 +13,16 @@ import pyLDAvis
 
 TODO:
 1) Run full train and analyse trained data
-2) Add numpy arrays instead of lists and check speed changes
-3) Write comments
-4) Try to add stemming and lemmatization
+    - Add graphs for each 100-it step an 0-it step to check changes
+    - Add verbal analysis
+    - Rerun all on 3.7.12 to avoid bug messages
+    - Commit ColabVersion
+    - Prepare submit version and write Readd
+    - Submit
+
+Optional
+1) Add numpy arrays instead of lists and check speed changes
+2) Try to add stemming and lemmatization, filter out verbs
 '''
 
 DEFAULT_MODEL_FILENAME = 'model.json'
@@ -27,6 +33,7 @@ DEFAULT_BETA = 0.1
 
 
 def plot_topic_distribution(topic_distribution: List[int]):
+    """Plots topic distribution as bar chart."""
     plt.bar(range(len(topic_distribution)), topic_distribution)
     plt.xticks(np.arange(0, len(topic_distribution), 1.0))
 
@@ -65,13 +72,14 @@ class DataHelper:
         8) document_to_word_count: List[int] - List of length NUM_OF_DOCS with document_size as values.
         9) word_to_index_in_vocab: Dict[str, int] - Dict with word_str as key and integer index in vocabulary as value.
         """
-        document_id_to_words, vocab_counter = self._get_document_id_to_words_and_vocab(input_filename)
+        document_id_to_words, term_frequency_counter = self._get_document_id_to_words_and_term_frequency_counter(input_filename)
 
-        # initialize main collection 3): vocab array and helper word_to_i dictionary
-        self.vocab = [word for word, word_count in vocab_counter.most_common()]
-        # init helper 10) collection
+        # initialize main collection 3): vocab array
+        # to save space we will assign lower indices to the most common words
+        self.vocab = [word for word, word_count in term_frequency_counter.most_common()]
+        # init helper 10) collection: word_to_i dictionary
         self._word_to_i = {word: i for i, word in enumerate(self.vocab)}
-        self.vocab_counter = vocab_counter
+        self.term_frequency_counter = term_frequency_counter
 
         # init helper collection 8)
         self.document_id_to_words = document_id_to_words
@@ -109,7 +117,8 @@ class DataHelper:
 
     def run_consistency_tests(self):
         """
-        There are too many collections and they should be consistent.
+        Check mutable collections for data consistency.
+
         List of readonly collections: 
             1) corpus
             3) vocab
@@ -121,8 +130,6 @@ class DataHelper:
             4) topic_counter
             5) document_topic_counters
             6) topic_word_counters
-
-        We will check list of mutable collections for consistency.
         """
 
         # basic size checks
@@ -150,14 +157,17 @@ class DataHelper:
         assert new_document_topic_counters == self.document_topic_counters
 
     def increase_topic_count_and_change_topic(self, *, corpus_id: int, word_id: int, document_id: int, topic_id: int):
+        """Increases topic count in all collections after Gibbs sampling step."""
         assert corpus_id < self.CORPUS_SIZE
         self.corpus_topic_distribution[corpus_id] = topic_id
         self._change_topic_count(word_id=word_id, document_id=document_id, topic_id=topic_id, change_num=1)
 
     def decrease_topic_count(self, *, word_id: int, document_id: int, topic_id: int):
+        """Increases topic count in all collections before Gibbs sampling step."""
         self._change_topic_count(word_id=word_id, document_id=document_id, topic_id=topic_id, change_num=-1)
 
     def get_most_popular_words_per_topic(self, topic_id: int, top_count: int = 10) -> List[str]:
+        """Returns top-n popular words for specific topic."""
         assert topic_id < self.NUM_OF_TOPICS
 
         top_word_ids = Counter(self.topic_word_counters[topic_id]).most_common()[:top_count]
@@ -166,10 +176,12 @@ class DataHelper:
 
     @classmethod
     def get_main_attribute_names(cls) -> List[str]:
+        """Returns list of attribute names to use for export/import serialization."""
         return ['topic_word_counters', 'vocab', 'document_topic_counters', 'corpus_topic_distribution', 'topic_counter',
                 'word_document_corpus']
 
     def export_trained_helper(self, model_filename: str = DEFAULT_MODEL_FILENAME) -> str:
+        """Serializes DataHelper to json format."""
         unique_timestamp = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
         os.mkdir(unique_timestamp)
 
@@ -185,15 +197,32 @@ class DataHelper:
         return path_to_model
 
     @staticmethod
-    def import_trained_helper(base_data_helper: 'DataHelper', path_to_model_file: str) -> 'DataHelper':
+    def import_trained_helper(path_to_model_file: str, 
+                              base_data_helper: Optional['DataHelper'] = None, 
+                              path_to_sorce_data: Optional[str] = None,
+    ) -> 'DataHelper':
+        """Deserializes DataHelper from json."""
+        if base_data_helper is None and path_to_sorce_data is None:
+            raise Exception('Either base_data_helper or path_to_sorce_data must be specified')
+        
+        if base_data_helper is None:
+            base_data_helper = DataHelper(path_to_sorce_data)
+
+        
         with open(path_to_model_file, 'r') as json_file:
             model_data = json.load(json_file)
             for attr_name, attr_value in model_data.items():
                 base_data_helper.__setattr__(attr_name, attr_value)
+        
+        # reset pseudo-contants based on imported data
+        base_data_helper.NUM_OF_TOPICS = len(base_data_helper.topic_counter)
+        base_data_helper.NUM_OF_DOCS = len(base_data_helper.document_topic_counters)
+        base_data_helper.CORPUS_SIZE = len(base_data_helper.word_document_corpus)
+        base_data_helper.VOCAB_SIZE = len(base_data_helper.vocab)
 
         return base_data_helper
 
-    def get_movies_vis_data(self):
+    def get_lda_vis_data(self):
         """
         Returns model data in pyLDAvis format.
 
@@ -205,13 +234,13 @@ class DataHelper:
             'doc_topic_dists': self.document_topic_counters,
             'doc_lengths': self.document_to_word_count,
             'vocab': self.vocab,
-            'term_frequency': [self.vocab_counter[word] for word in self.vocab]
+            'term_frequency': [self.term_frequency_counter[word] for word in self.vocab]
         }
 
         return pyLDAvis.prepare(**movies_model_data)
 
     def compare_data_helpers(self, other: 'DataHelper'):
-        # sanity check if we downloaded everything correctly
+        """Sanity check that can be applied to check export-import correctness."""
         for topic_id in range(self.NUM_OF_TOPICS):
             print(topic_id+1, end=" ")
             original_words = self.get_most_popular_words_per_topic(topic_id, 100)
@@ -221,12 +250,14 @@ class DataHelper:
                 raise Exception(f'Comparison failed on topic #{topic_id+1}')
 
     def print_top_words_for_all_topics(self, top_words_count: int = 10):
+        """Prints top-n words for all topics."""
         for topic_id in range(self.NUM_OF_TOPICS):
             print('Topic ID:', topic_id+1)
-            print('Top-10 words:', self.get_most_popular_words_per_topic(topic_id, top_words_count))
+            print(f'Top-{top_words_count} words:', self.get_most_popular_words_per_topic(topic_id, top_words_count))
     
     # private methods
     def _change_topic_count(self, word_id: int, document_id: int, topic_id: int, change_num: int):
+        """Either increases or decreases topic count for Gibbs sampling step."""
         assert topic_id < self.NUM_OF_TOPICS
         assert document_id < self.NUM_OF_DOCS
         assert word_id < self.VOCAB_SIZE
@@ -241,40 +272,35 @@ class DataHelper:
         self.topic_word_counters[topic_id][word_id] += change_num
         assert self.topic_word_counters[topic_id][word_id] >= 0
 
-    def _get_index_by_word(self, word: str) -> int:
-        return self._word_to_i[word]
-
-    def _get_random_topic_id(self) -> int:
-        # low - inclusive, high - exclusive
-        return np.random.randint(0, self.NUM_OF_TOPICS)
-
     def _create_word_document_corpus(self) -> List[Tuple[int, int]]:
         word_document_corpus = []
 
         for document_id, document_words in enumerate(self.document_id_to_words):
             for document_word in document_words:
                 # this means that we filtered out this word like as too rare or too common
-                if document_word not in self.vocab_counter:
+                if document_word not in self.term_frequency_counter:
                     continue
 
-                word_id = self._get_index_by_word(document_word)
+                word_id = self._word_to_i[document_word]
                 word_document_corpus.append((word_id, document_id))
 
         return word_document_corpus
 
-    def _get_document_id_to_words_and_vocab(
-        self, input_filename: str, no_below: int = 10, no_above: float = 0.5,
+    def _get_document_id_to_words_and_term_frequency_counter(
+        self, input_filename: str, no_below: int = 10, no_above: float = 0.5, skip_filtering: bool = True,
     ) -> Tuple[List[List[str]], Dict[str, int]]:
         """
-        Reads input files and creates helper collections.
+        Reads input files and creates initial helper collections:
+            document_id_to_words: List[List[str]] - list of words where document_id is an index in list
+            term_frequency_counter: Dict[str, int] - dictionary of word frequencies in corpus
 
-        We also filter vocab as in Gensim:
+        Also, there is a functionality to filter vocab as in Gensim:
         https://tedboy.github.io/nlps/generated/generated/gensim.corpora.Dictionary.filter_extremes.html.
         """
 
         word_to_document_ids = defaultdict(set)
         document_id_to_words = []
-        vocab_counter = Counter()
+        term_frequency_counter = Counter()
         with open(input_filename, 'r') as input_f:
             for i, line in enumerate(input_f):
                 # first line contains number of reviews
@@ -290,34 +316,45 @@ class DataHelper:
                 document_id_to_words[document_id] = document_words
 
                 for document_word in document_words:
-                    vocab_counter[document_word] += 1
+                    term_frequency_counter[document_word] += 1
                     word_to_document_ids[document_word].add(document_id)
         
         total_num_of_docs = len(document_id_to_words)
-        filtered_vocab_counter = Counter()
-        for word, word_count in vocab_counter.items():
-            num_docs_for_word = len(word_to_document_ids[word])
-            if num_docs_for_word < no_below:
-                continue
-            
-            if num_docs_for_word > no_above*total_num_of_docs:
-                continue
+        filtered_term_frequency_counter = term_frequency_counter if skip_filtering else Counter()
+        if not skip_filtering:
+            for word, word_count in term_frequency_counter.items():
+                num_docs_for_word = len(word_to_document_ids[word])
+                
+                if num_docs_for_word < no_below:
+                    continue
+                    
+                if num_docs_for_word > no_above*total_num_of_docs:
+                    continue
 
-            filtered_vocab_counter[word] = word_count
+                filtered_term_frequency_counter[word] = word_count
 
-        # to save space we will assign lower indices to the most common words
-        return document_id_to_words, filtered_vocab_counter
+        return document_id_to_words, filtered_term_frequency_counter
 
 
 class GibbsSampler:
+    """Class to train LDA topic modeling using Gibbs sampling."""
     def __init__(self, data_proxy: DataHelper, alpha: float = DEFAULT_ALPHA, beta: float = DEFAULT_BETA) -> None:
+        """
+        Initializes GibbsSampler by:
+            - data_proxy, containing all required data collections
+            - alpha - hyperparameter for Gibbs sampling formula
+            - beta - hyperparameter for Gibbs sampling formula
+        """
         self.data_proxy = data_proxy
 
         self.ALPHA = alpha
         self.BETA = beta
 
     def _gibbs_sampling(self, *, word_id: int, document_id: int, topic_id: int) -> float:
-        """Gibbs sampling according to formula above."""
+        """
+        Gibbs sampling according to formula [5] of Griffiths & Steyvers (2004).
+        Link to paper: https://www.pnas.org/content/101/suppl_1/5228
+        """
         c1 = self.data_proxy.topic_word_counters[topic_id][word_id]
         c2 = self.data_proxy.topic_counter[topic_id]
 
@@ -330,11 +367,28 @@ class GibbsSampler:
         return left_operand * right_operand
 
     def _softmax(self, x: List[float]):
+        """Softmax function to convert topic-specific floats produced by _gibbs_samling function to topic probabilites."""
         p = np.exp(x) / np.sum(np.exp(x))
         return p
 
     def train(self, num_of_iterations: int = DEFAULT_NUM_OF_ITERATIONS, iterations_to_save: int = -1) -> DataHelper:
-        """Trains and returns trained data proxy."""
+        """
+        Trains and returns trained data proxy.
+
+        Algorithm:
+        run for NUM_OF_ITERATIONS (hyperparam)
+            for each word_document pair in corpus
+                get current topic
+                decrease all respective counts:
+                    - general count of this topic;
+                    - count of this topic for specific word;
+                    - count of this topic in document;
+                run loop over topics count K
+                    re-evaluate word_to_topic sampling probabilites
+                choose new topic for the word based on weights obtained above
+                increase all respective counts
+
+        """
         for it in tqdm(range(num_of_iterations)):
             if iterations_to_save != -1 and (it + 1) % iterations_to_save == 0:
                 self.data_proxy.export_trained_helper()

@@ -365,11 +365,6 @@ class GibbsSampler:
 
         return left_operand * right_operand
 
-    def _softmax(self, x: List[float]):
-        """Softmax function to convert topic-specific floats produced by _gibbs_samling function to topic probabilites."""
-        p = np.exp(x) / np.sum(np.exp(x))
-        return p
-
     def train(self, num_of_iterations: int = DEFAULT_NUM_OF_ITERATIONS, iterations_to_save: int = -1) -> DataHelper:
         """
         Trains and returns trained data proxy.
@@ -401,8 +396,9 @@ class GibbsSampler:
                     gibbs_value = self._gibbs_sampling(document_id=document_id, topic_id=new_topic_id, word_id=word_id)
                     topic_weights.append(gibbs_value)
 
-                topic_weights = self._softmax(topic_weights)
-                best_new_topic_id = np.random.choice(self.data_proxy.NUM_OF_TOPICS, p=topic_weights) - 1
+                weights_sum = sum(topic_weights)
+                topic_weights = [weight / weights_sum  for weight in topic_weights]
+                best_new_topic_id = np.random.choice(self.data_proxy.NUM_OF_TOPICS, p=topic_weights)
                 self.data_proxy.increase_topic_count_and_change_topic(corpus_id=corpus_id, word_id=word_id,
                                                                       document_id=document_id,
                                                                       topic_id=best_new_topic_id)

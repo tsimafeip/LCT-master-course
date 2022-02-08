@@ -10,17 +10,7 @@ from tqdm import tqdm
 import pyLDAvis
 
 '''
-
-TODO:
-1) Run full train and analyse trained data
-    - Add graphs for each 100-it step an 0-it step to check changes
-    - Add verbal analysis
-    - Rerun all on 3.7.12 to avoid bug messages
-    - Commit ColabVersion
-    - Prepare submit version and write Readd
-    - Submit
-
-Optional
+Optional TODOs:
 1) Add numpy arrays instead of lists and check speed changes
 2) Try to add stemming and lemmatization, filter out verbs
 '''

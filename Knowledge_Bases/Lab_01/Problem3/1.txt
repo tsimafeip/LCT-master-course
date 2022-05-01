@@ -1,0 +1,20 @@
+# Characters in Lord of The Rings
+# I have taken named subquery from one of the examples about fictional characters.
+
+#title: Characters in Lord of The Rings
+SELECT DISTINCT ?character ?characterLabel WITH {
+  # Fictional character subclasses as a named subquery
+  SELECT ?fictiontype WHERE {
+    ?fictiontype wdt:P279* wd:Q95074. hint:Prior hint:gearing "forward".
+  }
+} AS %i
+WHERE
+{
+  INCLUDE %i
+  ?character wdt:P31 ?fictiontype;
+             wdt:P1441 wd:Q15228;
+
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en" }
+}
+
+https://query.wikidata.org/#%23title%3A%20Characters%20in%20Lord%20of%20The%20Rings%0ASELECT%20DISTINCT%20%3Fcharacter%20%3FcharacterLabel%20WITH%20%7B%0A%20%20%23%20Fictional%20character%20subclasses%20as%20a%20named%20subquery%0A%20%20SELECT%20%3Ffictiontype%20WHERE%20%7B%0A%20%20%20%20%3Ffictiontype%20wdt%3AP279%2a%20wd%3AQ95074.%20hint%3APrior%20hint%3Agearing%20%22forward%22.%0A%20%20%7D%0A%7D%20AS%20%25i%0AWHERE%0A%7B%0A%20%20INCLUDE%20%25i%0A%20%20%3Fcharacter%20wdt%3AP31%20%3Ffictiontype%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20wdt%3AP1441%20wd%3AQ15228%3B%0A%0A%20%20SERVICE%20wikibase%3Alabel%20%7B%20bd%3AserviceParam%20wikibase%3Alanguage%20%22en%22%20%7D%0A%7D

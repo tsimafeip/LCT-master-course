@@ -1,0 +1,201 @@
+Title, POS Type, POS, Frequency
+Google, ADJ, new, 25
+Google, ADJ, large, 21
+Google, ADJ, first, 17
+Google, ADJ, other, 14
+Google, ADJ, big, 14
+Google, VERB, live, 230
+Google, VERB, work, 50
+Google, VERB, announce, 33
+Google, VERB, include, 28
+Google, VERB, use, 26
+Selena Gomez, ADJ, first, 27
+Selena Gomez, ADJ, second, 25
+Selena Gomez, ADJ, single, 24
+Selena Gomez, ADJ, new, 21
+Selena Gomez, ADJ, top, 12
+Selena Gomez, VERB, release, 53
+Selena Gomez, VERB, work, 45
+Selena Gomez, VERB, have, 39
+Selena Gomez, VERB, go, 23
+Selena Gomez, VERB, want, 23
+Microsoft, ADJ, new, 39
+Microsoft, ADJ, other, 20
+Microsoft, ADJ, public, 14
+Microsoft, ADJ, large, 13
+Microsoft, ADJ, first, 13
+Microsoft, VERB, live, 143
+Microsoft, VERB, work, 46
+Microsoft, VERB, use, 44
+Microsoft, VERB, release, 38
+Microsoft, VERB, announce, 37
+Volkswagen, ADJ, new, 35
+Volkswagen, ADJ, electric, 33
+Volkswagen, ADJ, first, 28
+Volkswagen, ADJ, german, 24
+Volkswagen, ADJ, large, 24
+Volkswagen, VERB, live, 84
+Volkswagen, VERB, have, 37
+Volkswagen, VERB, produce, 37
+Volkswagen, VERB, sell, 27
+Volkswagen, VERB, announce, 27
+Brad Pitt, ADJ, first, 20
+Brad Pitt, ADJ, same, 17
+Brad Pitt, ADJ, american, 12
+Brad Pitt, ADJ, next, 9
+Brad Pitt, ADJ, critical, 9
+Brad Pitt, VERB, live, 159
+Brad Pitt, VERB, work, 88
+Brad Pitt, VERB, receive, 27
+Brad Pitt, VERB, play, 27
+Brad Pitt, VERB, star, 23
+Serena Williams, ADJ, first, 155
+Serena Williams, ADJ, final, 116
+Serena Williams, ADJ, second, 63
+Serena Williams, ADJ, third, 63
+Serena Williams, ADJ, open, 57
+Serena Williams, VERB, win, 268
+Serena Williams, VERB, lose, 130
+Serena Williams, VERB, single, 121
+Serena Williams, VERB, defeat, 94
+Serena Williams, VERB, work, 81
+Cristiano Ronaldo, ADJ, first, 118
+Cristiano Ronaldo, ADJ, national, 80
+Cristiano Ronaldo, ADJ, cite, 61
+Cristiano Ronaldo, ADJ, final, 59
+Cristiano Ronaldo, ADJ, international, 54
+Cristiano Ronaldo, VERB, invoke, 267
+Cristiano Ronaldo, VERB, work, 216
+Cristiano Ronaldo, VERB, score, 192
+Cristiano Ronaldo, VERB, win, 72
+Cristiano Ronaldo, VERB, become, 71
+Lionel Messi, ADJ, first, 138
+Lionel Messi, ADJ, final, 79
+Lionel Messi, ADJ, second, 77
+Lionel Messi, ADJ, national, 72
+Lionel Messi, ADJ, top, 63
+Lionel Messi, VERB, score, 188
+Lionel Messi, VERB, work, 122
+Lionel Messi, VERB, win, 95
+Lionel Messi, VERB, become, 65
+Lionel Messi, VERB, play, 62
+Sundar Pichai, ADJ, new, 11
+Sundar Pichai, ADJ, indian, 6
+Sundar Pichai, ADJ, other, 4
+Sundar Pichai, ADJ, open, 4
+Sundar Pichai, ADJ, many, 4
+Sundar Pichai, VERB, live, 26
+Sundar Pichai, VERB, have, 5
+Sundar Pichai, VERB, work, 5
+Sundar Pichai, VERB, bear, 4
+Sundar Pichai, VERB, include, 4
+Elon Musk, ADJ, first, 20
+Elon Musk, ADJ, private, 18
+Elon Musk, ADJ, public, 17
+Elon Musk, ADJ, net, 15
+Elon Musk, ADJ, early, 13
+Elon Musk, VERB, work, 58
+Elon Musk, VERB, say, 55
+Elon Musk, VERB, live, 46
+Elon Musk, VERB, have, 35
+Elon Musk, VERB, become, 28
+Shawn Mendes, ADJ, single, 29
+Shawn Mendes, ADJ, second, 18
+Shawn Mendes, ADJ, first, 16
+Shawn Mendes, ADJ, late, 10
+Shawn Mendes, ADJ, third, 9
+Shawn Mendes, VERB, release, 44
+Shawn Mendes, VERB, work, 23
+Shawn Mendes, VERB, make, 21
+Shawn Mendes, VERB, perform, 20
+Shawn Mendes, VERB, announce, 18
+Ed Sheeran, ADJ, single, 34
+Ed Sheeran, ADJ, first, 32
+Ed Sheeran, ADJ, good, 27
+Ed Sheeran, ADJ, big, 21
+Ed Sheeran, ADJ, new, 19
+Ed Sheeran, VERB, work, 56
+Ed Sheeran, VERB, release, 45
+Ed Sheeran, VERB, perform, 29
+Ed Sheeran, VERB, sell, 28
+Ed Sheeran, VERB, make, 28
+Vladimir Putin, ADJ, russian, 280
+Vladimir Putin, ADJ, military, 55
+Vladimir Putin, ADJ, presidential, 38
+Vladimir Putin, ADJ, new, 38
+Vladimir Putin, ADJ, political, 37
+Vladimir Putin, VERB, say, 102
+Vladimir Putin, VERB, work, 89
+Vladimir Putin, VERB, see, 37
+Vladimir Putin, VERB, have, 33
+Vladimir Putin, VERB, accord, 33
+George R. R. Martin, ADJ, short, 24
+George R. R. Martin, ADJ, executive, 22
+George R. R. Martin, ADJ, first, 21
+George R. R. Martin, ADJ, new, 21
+George R. R. Martin, ADJ, many, 11
+George R. R. Martin, VERB, write, 41
+George R. R. Martin, VERB, work, 34
+George R. R. Martin, VERB, have, 23
+George R. R. Martin, VERB, make, 20
+George R. R. Martin, VERB, go, 17
+Angela Merkel, ADJ, german, 106
+Angela Merkel, ADJ, federal, 37
+Angela Merkel, ADJ, european, 30
+Angela Merkel, ADJ, powerful, 22
+Angela Merkel, ADJ, political, 17
+Angela Merkel, VERB, live, 107
+Angela Merkel, VERB, work, 54
+Angela Merkel, VERB, say, 35
+Angela Merkel, VERB, become, 22
+Angela Merkel, VERB, have, 20
+Barack Obama, ADJ, last, 164
+Barack Obama, ADJ, first, 130
+Barack Obama, ADJ, presidential, 56
+Barack Obama, ADJ, new, 31
+Barack Obama, ADJ, democratic, 24
+Barack Obama, VERB, work, 129
+Barack Obama, VERB, live, 109
+Barack Obama, VERB, say, 45
+Barack Obama, VERB, see, 36
+Barack Obama, VERB, sign, 33
+Bill Gates, ADJ, first, 19
+Bill Gates, ADJ, private, 13
+Bill Gates, ADJ, other, 12
+Bill Gates, ADJ, nuclear, 12
+Bill Gates, ADJ, personal, 11
+Bill Gates, VERB, live, 70
+Bill Gates, VERB, work, 56
+Bill Gates, VERB, say, 29
+Bill Gates, VERB, have, 26
+Bill Gates, VERB, make, 24
+India, ADJ, indian, 182
+India, ADJ, large, 53
+India, ADJ, such, 30
+India, ADJ, other, 29
+India, ADJ, many, 29
+India, VERB, leave, 66
+India, VERB, have, 48
+India, VERB, live, 36
+India, VERB, include, 36
+India, VERB, become, 34
+United States of America, ADJ, american, 92
+United States of America, ADJ, large, 63
+United States of America, ADJ, federal, 51
+United States of America, ADJ, other, 46
+United States of America, ADJ, high, 46
+United States of America, VERB, have, 73
+United States of America, VERB, include, 48
+United States of America, VERB, see, 34
+United States of America, VERB, work, 33
+United States of America, VERB, lead, 33
+Germany, ADJ, german, 188
+Germany, ADJ, large, 42
+Germany, ADJ, right, 35
+Germany, ADJ, high, 22
+Germany, ADJ, european, 20
+Germany, VERB, live, 153
+Germany, VERB, include, 30
+Germany, VERB, become, 23
+Germany, VERB, have, 22
+Germany, VERB, work, 18

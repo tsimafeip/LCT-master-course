@@ -6,7 +6,7 @@ from time import sleep
 
 import requests
 
-from bs4 import BeautifulSoup as bs
+from bs4 import BeautifulSoup as bs, NavigableString
 from pprint import pprint
 from typing import Dict, List, Union, Tuple
 
@@ -29,6 +29,71 @@ def request_and_parse_page(url: str):
     return soup
 
 
+def get_seed_page_urls(soup):
+    seed_urls = []
+    for a in soup.find_all('a', href=True, attrs={'class': 'ueb', 'title': re.compile('öffnen')}):
+        seed_urls.append(a['href'])
+
+    # to filter out lower-level urls
+    max_len_href = max(len(href) for href in seed_urls)
+    seed_urls = [href for href in seed_urls if len(href) == max_len_href]
+
+    return seed_urls
+
+
+def parse_table(table, multidata_headers: List[str]) -> Dict[str, Union[str, List[str]]]:
+    rows = table.find_all('tr')
+
+    header_id_to_text = {}
+    header_id_to_data = defaultdict(list)
+    headers_to_resolve_from_naive = set()
+
+    for row in rows:
+        for table_header in row.find_all('th'):
+            header_id = table_header['id']
+            header_text = table_header.text.strip()
+            if header_id in header_id_to_text and header_id_to_text[header_id] != header_text:
+                headers_to_resolve_from_naive.update([header_text, header_id_to_text[header_id]])
+            header_id_to_text[header_id] = header_text
+
+        for data in row.find_all('td'):
+            data_header_id = data['headers'][0]
+            header_id_to_data[data_header_id].append(data.text.strip())
+
+    header_to_data = {}
+
+    for header_id, header_text in header_id_to_text.items():
+        if header_text in headers_to_resolve_from_naive:
+            continue
+
+        header_data = header_id_to_data[header_id]
+        if header_text not in multidata_headers:
+            if len(header_id_to_data[header_id]) > 1:
+                raise RuntimeError(
+                    f'Unable to resolve duplicate header id for table \'{table["summary"]}\': {header_id}!'
+                )
+
+            header_data = header_id_to_data[header_id][0]
+        header_to_data[header_text] = header_data
+
+    if headers_to_resolve_from_naive:
+        headers = []
+        data = []
+        for i, row in enumerate(rows):
+            for table_header in row.find_all('th'):
+                rowspan = int(table_header.get('rowspan', 1))
+                header_text = table_header.text.strip()
+                headers.extend([header_text] * rowspan)
+            data.extend([data.text.strip() for data in row.find_all('td')])
+
+        naive_header_to_data = dict(zip(headers, data))
+
+        for header_text in headers_to_resolve_from_naive:
+            header_to_data[header_text] = naive_header_to_data[header_text]
+
+    return header_to_data
+
+
 def problem_1(name: str) -> List[Dict[str, Union[str, List[str]]]]:
     '''
     1. Extract attributes from html content.
@@ -47,23 +112,18 @@ def problem_1(name: str) -> List[Dict[str, Union[str, List[str]]]]:
     attribute_name_to_value = {}
 
     for attr_name, attr_value in zip(attr_names, attr_values):
-        # TODO: clean values (from reference, for instance)
-        # TODO: process lists correctly
-        attribute_name_to_value[attr_name.text] = attr_value.text
+        values = []
+        for content in attr_value.contents:
+            content_text = content.text.strip()
+            # filter out references and non-textual data
+            if content_text and (isinstance(content, NavigableString) or content.attrs.get('class', [''])[0] != "reference"):
+                values.append(content_text)
+
+        if not values:
+            values = [attr_value.text.strip()]
+        attribute_name_to_value[attr_name.text] = " ".join(values)
 
     return [{'attribute': attr_name, 'value': attr_value} for attr_name, attr_value in attribute_name_to_value.items()]
-
-
-def get_seed_page_urls(soup):
-    seed_urls = []
-    for a in soup.find_all('a', href=True, attrs={'class': 'ueb', 'title': re.compile('öffnen')}):
-        seed_urls.append(a['href'])
-
-    # to filter out lower-level urls
-    max_len_href = max(len(href) for href in seed_urls)
-    seed_urls = [href for href in seed_urls if len(href) == max_len_href]
-
-    return seed_urls
 
 
 def problem_2_1() -> List[Dict[str, str]]:
@@ -83,68 +143,6 @@ def problem_2_1() -> List[Dict[str, str]]:
             course_name_to_link.append({a.text: a['href']})
 
     return course_name_to_link
-
-
-def parse_table(table, multidata_headers: List[str]) -> Dict[str, Union[str, List[str]]]:
-    rows = table.find_all('tr')
-
-    header_id_to_text = {}
-    header_id_to_data = defaultdict(list)
-    headers_to_resolve_from_naive = []
-
-    for row in rows:
-        for table_header in row.find_all('th'):
-            header_id = table_header['id']
-            header_text = table_header.text.strip()
-            if header_id in header_id_to_text and header_id_to_text[header_id] != header_text:
-                headers_to_resolve_from_naive.extend([header_text, header_id_to_text[header_id]])
-                # print(f'Duplicate header id for table \'{table["summary"]}\': {header_id}!')
-            header_id_to_text[header_id] = header_text
-
-        for data in row.find_all('td'):
-            data_header_id = data['headers'][0]
-            header_id_to_data[data_header_id].append(data.text.strip())
-
-    header_to_data = {}
-
-    if headers_to_resolve_from_naive:
-        headers = []
-        data = []
-        for i, row in enumerate(rows):
-            for table_header in row.find_all('th'):
-                rowspan = int(table_header.get('rowspan', 1))
-                header_text = table_header.text.strip()
-                headers.extend([header_text] * rowspan)
-            data.extend([data.text.strip() for data in row.find_all('td')])
-
-        naive_header_to_data = dict(zip(headers, data))
-
-        for header_text in headers_to_resolve_from_naive:
-            header_to_data[header_text] = naive_header_to_data[header_text]
-
-    # if header_id_to_texts:
-    #     for header_id, header_texts in header_id_to_texts.items():
-    #         header_data = header_id_to_data[header_id]
-    #         assert len(header_data) == len(header_texts)
-    #
-    #         for header_text, data in zip(header_texts, header_data):
-    #             header_to_data[header_text] = data
-
-    for header_id, header_text in header_id_to_text.items():
-        if header_text in headers_to_resolve_from_naive:
-            continue
-
-        header_data = header_id_to_data[header_id]
-        if header_text not in multidata_headers:
-            if len(header_id_to_data[header_id]) > 1:
-                raise RuntimeError(
-                    f'Unable to resolve duplicate header id for table \'{table["summary"]}\': {header_id}!'
-                )
-
-            header_data = header_id_to_data[header_id][0]
-        header_to_data[header_text] = header_data
-
-    return header_to_data
 
 
 def problem_2_2(url: str) -> Dict[str, Union[str, List[str]]]:
@@ -178,7 +176,7 @@ def problem_2_2(url: str) -> Dict[str, Union[str, List[str]]]:
         responsible_instructors_parsed = parse_table(instructors_table, multidata_headers)
         responsible_instructors = responsible_instructors_parsed.get(RESPONSIBLE_INSTRUCTORS_HEADER)
         if not responsible_instructors:
-            responsible_instructors = [responsible_instructors_parsed[SINGLE_INSTRUCTOR_HEADER],]
+            responsible_instructors = [responsible_instructors_parsed[SINGLE_INSTRUCTOR_HEADER], ]
 
     attribute_name_to_value[RESPONSIBLE_INSTRUCTORS_HEADER] = responsible_instructors
 
@@ -231,9 +229,11 @@ def problem_2_3() -> None:
 
 def main():
     # You can call your functions here to test their behaviours.
-    # pprint(problem_1("Lily Aldrin"))
-    # pprint(problem_2_1())
-    # pprint(problem_2_2(""))
+    pprint(problem_1("Lily Aldrin"))
+    pprint(problem_1("Tracy McConnell"))
+    pprint(problem_1("Marshall Eriksen"))
+    pprint(problem_2_1())
+    #pprint(problem_2_2(""))
     pprint(problem_2_3())
 
 

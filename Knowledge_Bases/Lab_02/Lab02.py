@@ -14,6 +14,7 @@ from tqdm import tqdm
 
 ENGLISH_URL_POSTFIX = '&language=en'
 COURSE_NAME_HEADER = "Name of Course"
+URL_HEADER = "URL"
 ADDITIONAL_LINKS_HEADER = "Additional Links"
 RESPONSIBLE_INSTRUCTORS_HEADER = "Responsible Instructors"
 SINGLE_INSTRUCTOR_HEADER = "Responsible Instructor"
@@ -58,7 +59,7 @@ def parse_table(table, multidata_headers: List[str]) -> Dict[str, Union[str, Lis
 
         for data in row.find_all('td'):
             data_header_id = data['headers'][0]
-            header_id_to_data[data_header_id].append(data.text.strip())
+            header_id_to_data[data_header_id].append(data.text.strip().replace(u'\xa0', u' '))
 
     header_to_data = {}
 
@@ -116,12 +117,13 @@ def problem_1(name: str) -> List[Dict[str, Union[str, List[str]]]]:
         for content in attr_value.contents:
             content_text = content.text.strip()
             # filter out references and non-textual data
-            if content_text and (isinstance(content, NavigableString) or content.attrs.get('class', [''])[0] != "reference"):
+            if content_text and (
+                    isinstance(content, NavigableString) or content.attrs.get('class', [''])[0] != "reference"):
                 values.append(content_text)
 
         if not values:
             values = [attr_value.text.strip()]
-        attribute_name_to_value[attr_name.text] = " ".join(values)
+        attribute_name_to_value[attr_name.text.strip().replace(':', '')] = " ".join(values)
 
     return [{'attribute': attr_name, 'value': attr_value} for attr_name, attr_value in attribute_name_to_value.items()]
 
@@ -134,15 +136,15 @@ def problem_2_1() -> List[Dict[str, str]]:
     soup = request_and_parse_page(url=base_url + ENGLISH_URL_POSTFIX)
     seed_page_urls = get_seed_page_urls(soup)
 
-    course_name_to_link = []
+    course_name_to_link = {}
 
     for seed_page_url in seed_page_urls:
         soup = request_and_parse_page(url=seed_page_url + ENGLISH_URL_POSTFIX)
 
         for a in soup.find_all('a', href=True, attrs={'title': re.compile('More information about')}):
-            course_name_to_link.append({a.text: a['href']})
+            course_name_to_link[a.text.strip()] = a['href']
 
-    return course_name_to_link
+    return [{COURSE_NAME_HEADER: course_name, URL_HEADER: url} for course_name, url in course_name_to_link.items()]
 
 
 def problem_2_2(url: str) -> Dict[str, Union[str, List[str]]]:
@@ -190,29 +192,28 @@ def problem_2_2(url: str) -> Dict[str, Union[str, List[str]]]:
 
 def problem_2_3() -> None:
     """16 fields"""
-    course_name_to_url = problem_2_1()
+    course_name_to_url_list = problem_2_1()
 
-    # open the file in the write mode
+    header_values = [COURSE_NAME_HEADER]
+    headers_set = set(header_values)
+    parsed_course_info: List[Dict[str, str]] = []
+
+    for course_name_url_dict in tqdm(course_name_to_url_list):
+        course_name, course_url = course_name_url_dict[COURSE_NAME_HEADER], course_name_url_dict[URL_HEADER]
+        course_attributes = problem_2_2(url=course_url)
+        if set(course_attributes) - headers_set:
+            for new_header_name in course_attributes:
+                if new_header_name not in headers_set:
+                    header_values.append(new_header_name)
+            headers_set = set(header_values)
+
+        full_course_attributes = {COURSE_NAME_HEADER: course_name}
+        full_course_attributes.update(course_attributes)
+
+        parsed_course_info.append(full_course_attributes)
+
     with open('courses.csv', 'w') as f:
         writer = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        header_values = [COURSE_NAME_HEADER]
-        headers_set = set(header_values)
-        parsed_course_info: List[Dict[str, str]] = []
-
-        for course_name_url in tqdm(course_name_to_url):
-            for course_name, course_url in course_name_url.items():
-                course_attributes = problem_2_2(url=course_url)
-                if set(course_attributes) - headers_set:
-                    for new_header_name in course_attributes:
-                        if new_header_name not in headers_set:
-                            header_values.append(new_header_name)
-                    headers_set = set(header_values)
-
-                full_course_attributes = {COURSE_NAME_HEADER: course_name}
-                full_course_attributes.update(course_attributes)
-
-                parsed_course_info.append(full_course_attributes)
-
         writer.writerow(header_values)
         for current_course_dict in parsed_course_info:
             attribute_values = []
@@ -233,7 +234,7 @@ def main():
     pprint(problem_1("Tracy McConnell"))
     pprint(problem_1("Marshall Eriksen"))
     pprint(problem_2_1())
-    #pprint(problem_2_2(""))
+    # pprint(problem_2_2(""))
     pprint(problem_2_3())
 
 

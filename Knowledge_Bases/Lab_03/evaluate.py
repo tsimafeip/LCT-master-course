@@ -7,7 +7,8 @@ Created on Nov 8, 2019
 import codecs
 import sys
 
-from nltk.stem import WordNetLemmatizer 
+import nltk
+from nltk.stem import WordNetLemmatizer
 lemmatizer = WordNetLemmatizer() 
 
 ##open results file  
@@ -99,8 +100,10 @@ def evaluate(pFile, gtFile, hard):
 
 
 if __name__ == '__main__':
+    #sys.argv = ['test', 'results.tsv', 'test-groundtruth.tsv']
     if len(sys.argv) != 3:
         raise ValueError('Expected exactly 2 argument: predicted type file and groundtruth type file')
+
     evaluate(sys.argv[1], sys.argv[2], True)
     evaluate(sys.argv[1], sys.argv[2], False)
 

@@ -4,7 +4,7 @@ from collections import Counter
 
 from spacy import Language
 
-from helper import get_unique_types, read_train_file, check_pos_for_types
+from helper import read_train_file, check_pos_for_types
 
 
 class SimplePredictor:

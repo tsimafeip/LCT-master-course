@@ -18,12 +18,14 @@ TODO:
 We can later use it as a backup prediction for classes which are not appearing in the sentence.
 
 a) Find POS tags - spacy
-b) Rule
+b) Apply rules
 - find is-a
 - do pos tags parsing
 - pattern: [smth] is a(an)
 { 'NOUN', 'PROPN', 'ADJ NOUN', 'PROPN NOUN', 'NOUN ADP PROPN', 'NOUN NOUN', 'NOUN NOUN NOUN'}
 - extend to such_as
+
+Problem: no use of named_entity at all
 
 
 2) Tweak a bit my lab about POS-prediction for NER-task

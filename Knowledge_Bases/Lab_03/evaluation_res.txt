@@ -1,5 +1,8 @@
-0it [00:00, ?it/s]Train precision, recall and f-score: 0.20180627290302103 0.28263153640992483 0.2354763227446425
-20000it [00:08, 2307.90it/s]
-Train precision, recall and f-score: 0.17188582813582814 0.3207387052452922 0.22382335523532898
-20000it [01:01, 327.18it/s]
-Train precision, recall and f-score: 0.46539492353775813 0.119292006788976 0.18990639776126605
+POS-based with fallback: Train precision, recall and f-score: 0.20180627290302103 0.28263153640992483 0.2354763227446425
+Substr matching: Train precision, recall and f-score: 0.17188582813582814 0.3207387052452922 0.22382335523532898
+POS-based (no lemma, no 'and' parsing): Train precision, recall and f-score: 0.46539492353775813 0.119292006788976 0.18990639776126605
+
+Added text by lemma instead of raw tokens + 'and' parsing for POS-based approach:
+POS-based with fallback: Train precision, recall and f-score: 0.21288669229361157 0.28198496726743716 0.24261177943119394
+Substr matching: Train precision, recall and f-score:         0.17188582813582814 0.3207387052452922  0.22382335523532898
+POS-based: Train precision, recall and f-score:               0.4373219373219373  0.1488725450577871  0.22212842930358756

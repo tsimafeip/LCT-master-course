@@ -28,32 +28,52 @@ class SimplePredictor:
         pattern_phrase = discovered_patterns[0]
 
         parsed_sentence = self.nlp(sentence)
-        after_phrase_tokens = []
+        after_phrase = []
         for i in range(len(parsed_sentence) - 1):
             if f" {parsed_sentence[i].text} {parsed_sentence[i + 1].text} " == pattern_phrase:
-                after_phrase_tokens = parsed_sentence[i + 2:]
+                after_phrase = parsed_sentence[i + 2:]
 
-        pos_pattern_maxlen = max([len(type_pos_pattern) for type_pos_pattern in self.type_pos_patterns])
+        pos_pattern_maxlen = 5 # max([len(type_pos_pattern) for type_pos_pattern in self.type_pos_patterns])
 
-        # overrides possible
-        pos_pattern_to_text = {}
+        after_phrase_tokens_list = [after_phrase]
+        if 'and' in [token.text for token in after_phrase[:7]]:
+            cur_tokens = []
+            after_phrase_tokens_list = []
 
-        # no overrides
-        text_to_pos_pattern = {}
+            for token in after_phrase:
+                if token.text == 'and':
+                    after_phrase_tokens_list.append(cur_tokens)
+                    cur_tokens = []
+                else:
+                    cur_tokens.append(token)
+            after_phrase_tokens_list.append(cur_tokens)
 
         # 3, 2, 1
-        for pos_pattern_len in range(pos_pattern_maxlen, 0, -1):
-            for i in range(pos_pattern_len):
-                tokens = after_phrase_tokens[i:pos_pattern_len]
-                pos_pattern = tuple([token.pos_ for token in tokens])
-                text = " ".join([token.text for token in tokens])
-                pos_pattern_to_text[pos_pattern] = text
-                text_to_pos_pattern[text] = pos_pattern
+        predictions = []
+        for after_phrase_tokens in after_phrase_tokens_list:
+            # overrides possible
+            pos_pattern_to_text = {}
 
-        for trained_pos_pattern in self.type_pos_patterns:
-            prediction = pos_pattern_to_text.get(trained_pos_pattern, None)
-            if prediction in self.known_types:
-                return [prediction, ]
+            # no overrides
+            text_to_pos_pattern = {}
+            for pos_pattern_len in range(pos_pattern_maxlen, 0, -1):
+                for i in range(pos_pattern_len):
+                    tokens = after_phrase_tokens[i:pos_pattern_len]
+                    pos_pattern = tuple([token.pos_ for token in tokens])
+                    text = " ".join([token.text for token in tokens])
+                    lemma_text = " ".join([token.lemma_ for token in tokens])
+
+                    pos_pattern_to_text[pos_pattern] = lemma_text
+                    text_to_pos_pattern[lemma_text] = pos_pattern
+
+            for trained_pos_pattern in self.type_pos_patterns:
+                prediction = pos_pattern_to_text.get(trained_pos_pattern, None)
+                if prediction in self.known_types:
+                    predictions.append(prediction)
+                    break
+
+        if predictions:
+            return predictions
 
         return self._predict_type_substr_matching(sentence=sentence) if fallback_to_substr_matching else []
 
@@ -83,7 +103,7 @@ class SimplePredictor:
         self.type_pos_patterns = [pattern for pattern, count in type_pos_patterns]
 
         for prediction_method in \
-                [self._predict_type_pos_matching_with_fallback, self._predict_type_substr_matching,
+                [self._predict_type_substr_matching,
                  self._predict_type_pos_matching,
                  self._predict_type_pos_matching_with_fallback]:
 
@@ -102,7 +122,7 @@ class SimplePredictor:
             precision = true_positives / (true_positives + false_positives)
             recall = true_positives / (true_positives + false_negatives)
             f_score = 2 * precision * recall / (precision + recall)
-            print('Train precision, recall and f-score:', precision, recall, f_score)
+            print('Train precision, recall and f-score: {:.3f}, {:.3f}, {:.3f}'.format(precision, recall, f_score))
 
     def test(self):
         pass

@@ -1,7 +1,7 @@
 import ast
 import json
 import os.path
-from typing import Tuple, Generator, List
+from typing import Tuple, Generator, List, Optional
 
 import spacy
 import torch
@@ -14,8 +14,13 @@ from tqdm import tqdm
 
 OTHER_TAG = '<O>'
 SEP_TOKEN = '<SEP>'
+
 DEV_RATIO = 0.1
 BEST_CHECKPOINT = "best-model.pt"
+LEARNING_RATE = 0.001
+OPTIMIZER_CLASS = torch.optim.Adam
+LOSS_FUNCTION = nn.functional.cross_entropy
+NUM_EPOCHS = 10
 TRAIN_MODEL = True
 
 
@@ -133,7 +138,7 @@ class NerDataLoader:
 
         return train_dataloader
 
-    def load_data(self, train_filename, dev_filename, test_filename, nlp):
+    def load_data(self, nlp: Language, train_filename: str, dev_filename: str, test_filename=None):
         train_dataloader, dev_dataloader, test_dataloader, vocab, tagset, fasttext_embeddings = self.load(
             train_filename, dev_filename, test_filename, nlp=nlp)
 
@@ -203,6 +208,10 @@ class NeuralPredictor(nn.Module):
         # Initializes internal Module state.
         super().__init__()
 
+        self.vocab = kwargs['vocab']
+        self.tagset = kwargs['tagset']
+        self.nlp = kwargs['nlp']
+
         # embedding layers tranforms binary vector to smaller representation with non-binary elements
         self.embedding = nn.Embedding.from_pretrained(pretrained_embeddings, freeze=True)
 
@@ -217,8 +226,6 @@ class NeuralPredictor(nn.Module):
 
         # dropout layer to regulize training and avoid overfitting
         self.dropout = nn.Dropout(dropout)
-
-        self.nlp = kwargs['nlp']
 
     # forward function
     def forward(self, raw_input: torch.Tensor):
@@ -247,14 +254,15 @@ class NeuralPredictor(nn.Module):
         return predictions.view(sequence_length, -1)
 
     def predict_type(self, named_entity: str, sentence: str):
-        sentence = [token.text for token in nlp(named_entity)] + [SEP_TOKEN] + [token.text for token in nlp(sentence)]
+        sentence = [token.text for token in self.nlp(named_entity)] + [SEP_TOKEN] + \
+                   [token.text for token in self.nlp(sentence)]
 
-        sentence_numerical_vector = torch.LongTensor(vocab.lookup_indices(sentence))
+        sentence_numerical_vector = torch.LongTensor(self.vocab.lookup_indices(sentence))
 
-        outputs = model.forward(sentence_numerical_vector)
+        outputs = self.forward(sentence_numerical_vector)
         _, predicted_tags_indices = torch.max(outputs.data, 1)
 
-        predicted_tags = tagset.lookup_tokens(predicted_tags_indices.numpy())
+        predicted_tags = self.tagset.lookup_tokens(predicted_tags_indices.numpy())
 
         print(sentence)
         print(predicted_tags)
@@ -287,7 +295,6 @@ class NeuralPredictor(nn.Module):
             -> Tuple[float, float]:
         """
         Runs one complete training epoch, i. e. trains the model on the whole amount of available training data and updates weights.
-        :param model: a pytorch model
         :param optimizer: a pytorch optimizer
         :param loss_function: the type of loss function to use
         :param dataloader: a dataloader for getting the training instances
@@ -333,7 +340,6 @@ class NeuralPredictor(nn.Module):
         Runs one complete validation (test) loop,
         i. e. validates(tests) the model on the whole amount of available validation (test) data and reports quality metrics.
 
-        :param model: a pytorch model
         :param loss_function: the type of loss function to use
         :param dataloader: a dataloader for getting the validation (test) instances
 
@@ -358,13 +364,18 @@ class NeuralPredictor(nn.Module):
         return epoch_loss, epoch_accuracy
 
 
-def load_default_predictor() -> NeuralPredictor:
+def load_default_predictor(train_filepath: str, dev_filepath: Optional[str]):
+    nlp = spacy.load('en_core_web_sm')
+    ner_data_loader = NerDataLoader()
+
+    train_dataloader, dev_dataloader, _, vocab, tagset, fasttext_embeddings = \
+        ner_data_loader.load_data(nlp=nlp, train_filename=train_filepath, dev_filename=dev_filepath)
+
     hyperparams = {
-        "output_size": len(tagset),
         "pretrained_embeddings": fasttext_embeddings,
         "input_size": len(vocab),
         "hidden_size": 128,
-        "num_classes": len(tagset),
+        "output_size": len(tagset),
         "embeddings_type": 'fasttext',
         "batch_size": 1,
         "num_epochs": 10,
@@ -374,10 +385,10 @@ def load_default_predictor() -> NeuralPredictor:
         "dropout": 0.25,
     }
 
-    model = NeuralPredictor(**hyperparams, nlp=nlp)
+    model = NeuralPredictor(**hyperparams, nlp=nlp, vocab=vocab)
     if os.path.isfile(BEST_CHECKPOINT):
         model.load_state_dict(torch.load(BEST_CHECKPOINT))
-    return model
+    return model, train_dataloader, dev_dataloader, vocab, tagset, fasttext_embeddings
 
 
 def create_dev_file(train_filename: str, dev_filename: str):
@@ -397,36 +408,15 @@ if __name__ == '__main__':
     # data files
     train_filename = 'train.tsv'
     dev_filename = 'dev.tsv'
-    test_filename = 'test.tsv'
-    gold_test_filename = 'test-groundtruth.tsv'
 
-    nlp = spacy.load('en_core_web_sm')
-    ner_data_loader = NerDataLoader()
-    train_dataloader, dev_dataloader, test_dataloader, vocab, tagset, fasttext_embeddings = \
-        ner_data_loader.load_data(train_filename, dev_filename, test_filename, nlp)
-
-    hyperparams = {
-        "output_size": len(tagset),
-        "pretrained_embeddings": fasttext_embeddings,
-        "input_size": len(vocab),
-        "hidden_size": 128,
-        "num_classes": len(tagset),
-        "embeddings_type": 'fasttext',
-        "batch_size": 1,
-        "num_epochs": 10,
-        "learning_rate": 0.001,
-        "num_lstm_layers": 2,
-        "bidirectional": True,
-        "dropout": 0.25,
-    }
-
-    model = NeuralPredictor(**hyperparams, nlp=nlp)
+    model, train_dataloader, dev_dataloader, *_ = \
+        load_default_predictor(train_filepath=train_filename, dev_filepath=dev_filename)
 
     # check if forward path works
-    for item in train_dataloader:
-        tokens = item[0][0]
-        model.forward(tokens)
-        break
+    # for item in train_dataloader:
+    #     tokens = item[0][0]
+    #     model.forward(tokens)
+    #     break
 
     if os.path.isfile(BEST_CHECKPOINT):
         model.load_state_dict(torch.load(BEST_CHECKPOINT))
@@ -434,13 +424,11 @@ if __name__ == '__main__':
                            named_entity='Francisco Valero')
 
     if TRAIN_MODEL:
-        OPTIMIZER_CLASS = torch.optim.Adam
-        LOSS_FUNCTION = nn.functional.cross_entropy
         best_epoch = best_accuracy = best_val_loss = float('inf')
         # create optimizer instance
-        optimizer = OPTIMIZER_CLASS(model.parameters(), lr=hyperparams["learning_rate"])
+        optimizer = OPTIMIZER_CLASS(model.parameters(), lr=LEARNING_RATE)
         # iterates by epochs
-        for epoch in range(1, hyperparams['num_epochs'] + 1):
+        for epoch in range(1, NUM_EPOCHS + 1):
             print(f'Epoch #{epoch}')
             train_loss, train_accuracy = model.train_loop(optimizer, LOSS_FUNCTION, train_dataloader)
             val_loss, val_accuracy = model.validation_loop(LOSS_FUNCTION, dev_dataloader)

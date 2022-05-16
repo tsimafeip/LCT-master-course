@@ -45,7 +45,7 @@ if __name__ == '__main__':
     check_type_presence_in_sentences_train(TRAIN_FILEPATH)
 
     # print('Loading English from spacy...')
-    # nlp = spacy.load('en_core_web_sm')
+    nlp = spacy.load('en_core_web_sm')
     # print('Loading completed.')
     #
     # parsed_sentence = nlp('The Oregon Skyline Trail is a long-distance trail in the Cascade Mountains of Oregon.')
@@ -53,6 +53,6 @@ if __name__ == '__main__':
     # predictor = SimplePredictor(nlp=nlp)
     # predictor.train(train_filepath=TRAIN_FILEPATH)
     #predictor.evaluate_on_train_data(train_filepath=TRAIN_FILEPATH)
-    #check_pos_for_types(nlp, 'setup/train.tsv')
+    check_pos_for_types(nlp, TRAIN_FILEPATH)
 
 

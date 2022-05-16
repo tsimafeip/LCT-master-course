@@ -1,7 +1,5 @@
 import ast
-import json
-from collections import Counter
-from typing import List, Tuple, Generator, Iterable
+from typing import List, Tuple, Generator
 
 from spacy import Language
 from tqdm import tqdm
@@ -86,6 +84,7 @@ def check_type_presence_in_sentences_train(source_filepath: str):
 
 def check_pos_for_types(nlp: Language, source_filepath: str):
     original_types = []
+    lemma_types = []
     pos_tags = []
 
     for i, named_entity, types, sentence in read_train_file(train_filepath=source_filepath):
@@ -93,5 +92,6 @@ def check_pos_for_types(nlp: Language, source_filepath: str):
             doc = nlp(type)
             pos_tags.append(tuple([token.pos_ for token in doc]))
             original_types.append(tuple([token.text for token in doc]))
+            lemma_types.append(tuple([token.lemma_ for token in doc]))
 
-    return original_types, pos_tags
+    return original_types, lemma_types, pos_tags

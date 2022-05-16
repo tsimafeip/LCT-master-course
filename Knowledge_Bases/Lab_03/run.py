@@ -20,7 +20,7 @@ def your_typing_function(input_file, result_file):
     The results is saved in the result file (e.g. results.tsv)
     '''
     nlp = spacy.load('en_core_web_sm')
-    predictor = SimplePredictor(nlp=nlp, simplified_type_system=True)
+    predictor = SimplePredictor(nlp=nlp)
     predictor.train(train_filepath=TRAIN_FILEPATH)
 
     with open(input_file, 'r', encoding='utf8') as fin, open(result_file, 'w', encoding='utf8') as fout:

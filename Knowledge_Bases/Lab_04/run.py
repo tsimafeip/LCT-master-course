@@ -2,23 +2,17 @@ import json
 import os.path
 import sys
 from collections import defaultdict, Counter, deque
-from itertools import chain, combinations
 from typing import Set, Dict, List, Tuple, Optional
 
-import numpy
-import spacy
-from networkx.drawing.nx_pydot import graphviz_layout
 from nltk.corpus import stopwords
 import networkx as nx
 import matplotlib.pyplot as plt
-from networkx import Graph
 from tqdm import tqdm
 
 ROOT_NODE = 'entity'
 SCORE_DIFF_THRESHOLD = 0.3
-REQUIRED_MAX_DEPTH = 4
 
-NON_INFORMATIVE_HYPERNYMS = {'thing', 'name', 'group'}
+NON_INFORMATIVE_HYPERNYMS = {'thing', 'name', 'group', 'element', 'local', 'member'}
 
 
 class TaxonomyGraphBuilder:
@@ -62,14 +56,11 @@ class TaxonomyGraphBuilder:
             return hyponym_to_hypernym, hypernym_to_hyponym
 
     @staticmethod
-    def add_non_cycle_edge(g: Graph, node_1: str, node_2: str):
-        if node_1 is None or node_2 is None:
-            t = 1
-
+    def add_non_cycle_edge(g: nx.Graph, node_1: str, node_2: str):
         if node_1 != node_2:
             g.add_edge(node_1, node_2)
 
-    def build_taxonomy_graph(self, sample_terms: Set[str]) -> Graph:
+    def build_taxonomy_graph(self, sample_terms: Set[str]) -> nx.Graph:
         """
         Limitations:
         1) Max 50 nodes.
@@ -77,7 +68,7 @@ class TaxonomyGraphBuilder:
         3) Depth at least 4.
         """
 
-        g = Graph()
+        g = nx.Graph()
         # leaves are supposed to have less hyponyms than generic upper nodes
         term_traversal_order = sorted(sample_terms,
                                       key=lambda term: len(self.hypernym_to_hyponym.get(term, [])))
@@ -109,7 +100,7 @@ class TaxonomyGraphBuilder:
 
                 if filtered_parent_candidates:
                     best_parent_from_terms = filtered_parent_candidates[0]
-                    best_hypernym = self.get_best_hypernym_by_score(term)
+                    best_hypernym, score = self.get_best_hypernym_by_score(term)
                     if best_hypernym and self.is_good_hypernym(hypernym=best_parent_from_terms, hynonym=best_hypernym):
                         self.add_non_cycle_edge(g, term, best_hypernym)
                         self.add_non_cycle_edge(g, best_hypernym, best_parent_from_terms)
@@ -117,36 +108,8 @@ class TaxonomyGraphBuilder:
                         self.add_non_cycle_edge(g, term, best_parent_from_terms)
                     break
             else:
-                # predicted_hypernym = predict_hypernym(taxonomy_builder, term)
-                # if predicted_hypernym:
-                #     add_extra_layer_before_entity(g, hyponym=term, hypernym=predicted_hypernym, final_layer=False)
-                #     next_predicted_hypernym = predict_hypernym(taxonomy_builder, predicted_hypernym)
-                #     add_extra_layer_before_entity(g, hyponym=predicted_hypernym,
-                #                                   hypernym=next_predicted_hypernym,
-                #                                   final_layer=True)
-                # else:
-                # best_hypernym = taxonomy_builder.get_best_hypernym_by_score(term)
-
-                # best_hypernym = taxonomy_builder.predict_hypernym_from_most_common_words(term)
-                # if best_hypernym:
-                #     g.add_edge(term, best_hypernym)
-                #     g.add_edge(best_hypernym, ROOT_NODE)
-                # else:
-                #    g.add_edge(term, ROOT_NODE)
-
-                # if not expand_leaf_to_4_level:
-                #     cur_term = term
-                #     next_term, count = self.predict_hypernym_from_most_common_words(cur_term)
-                #     for i in range(REQUIRED_MAX_DEPTH - 1):
-                #         self.add_non_cycle_edge(g, cur_term, next_term)
-                #         cur_term = next_term
-                #         next_term, count = self.predict_hypernym_from_most_common_words(cur_term)
-                #     self.add_non_cycle_edge(g, cur_term, ROOT_NODE)
-                #     expand_leaf_to_4_level = True
-                #     continue
-
                 common_words = self.count_common_words(term)
-                if common_words and common_words.most_common()[0][1] > 50:
+                if common_words and common_words.most_common()[0][1] >= 45:
                     good_hypernym = common_words.most_common()[0][0]
                     self.add_non_cycle_edge(g, term, good_hypernym)
                     self.add_non_cycle_edge(g, good_hypernym, ROOT_NODE)
@@ -155,8 +118,9 @@ class TaxonomyGraphBuilder:
 
         return g
 
-    def build_and_draw_taxonomy_graph(self, terms: Set[str]):
+    def build_and_draw_taxonomy_graph(self, terms: Set[str], input_name: str):
         graph = self.build_taxonomy_graph(terms)
+
         nx.draw(graph, with_labels=True)
         plt.show()
 
@@ -188,10 +152,10 @@ class TaxonomyGraphBuilder:
 
         return counter_based + score_based
 
-    def get_best_hypernym_by_score(self, hyponym: str) -> Optional[str]:
+    def get_best_hypernym_by_score(self, hyponym: str) -> Optional[Tuple[str, float]]:
         candidates = self.get_top_with_scores_list(hyponym)
         if candidates:
-            return [candidate for candidate in candidates if candidate != hyponym][0][0]
+            return [candidate for candidate in candidates if candidate != hyponym][0]
 
     def predict_hypernym_from_most_common_words(self, hyponym: str) -> Optional[Tuple[str, int]]:
         most_common_words = self.count_common_words(hyponym=hyponym).most_common()
@@ -231,18 +195,18 @@ def read_terms_from_file(filepath: str) -> Set[str]:
     return terms
 
 
-def add_extra_layer_before_entity(graph: Graph, hyponym: str, hypernym: str, final_layer: bool = False):
+def add_extra_layer_before_entity(graph: nx.Graph, hyponym: str, hypernym: str, final_layer: bool = False):
     TaxonomyGraphBuilder.add_non_cycle_edge(graph, hyponym, hypernym)
     if final_layer:
         TaxonomyGraphBuilder.add_non_cycle_edge(graph, hypernym, ROOT_NODE)
 
 
 if __name__ == '__main__':
-    sys.argv = ['test', 'data/input-2.txt']
     if len(sys.argv) != 2:
         raise ValueError('Expected exactly 1 argument: input file.')
 
+    input_file = sys.argv[1]
     sample_terms = read_terms_from_file(sys.argv[1])
 
     taxonomy_builder = TaxonomyGraphBuilder(wedisalod_filepath='data/webisalod-pairs.txt')
-    taxonomy_builder.build_and_draw_taxonomy_graph(terms=sample_terms)
+    taxonomy_builder.build_and_draw_taxonomy_graph(terms=sample_terms, input_name=input_file)

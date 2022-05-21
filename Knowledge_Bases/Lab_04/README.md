@@ -1,0 +1,7 @@
+- This exercise is about taxonomy graph construction.
+- Input data from WEBISALOD available for downloading [here](!https://www.mpi-inf.mpg.de/fileadmin/inf/d5/teaching/ss22_akbc/lab04_material.zip).
+- I do some data preprocessing. It takes around 2-3 minutes to complete for the first run.
+- Main ideas are the following
+  - Preprocess webisalod: replace + and _ with spaces, build hypernym-hyponym graph (implemented as dict).
+  - 
+- Please rerun graph visualisation in case of bad picture.

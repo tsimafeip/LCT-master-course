@@ -1,3 +1,13 @@
+INPUT-1
+- Dog not an animal, other things ok
+
+INPUT-2
+- Problem with bell, donald duck is element and device
+
+
+
+
+
 Current state:
 1) Input-2 is very flat, we need to enlarge it. However, no bad nodes.
 2) Input-1: no extremely bad things
